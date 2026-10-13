@@ -1,0 +1,5 @@
+# Keep frame pointers so async-profiler / perf / JFR can show one stack across
+# Java -> Panama/JNI -> Rust SDK -> HTTP/TLS. Negligible runtime cost.
+# Note: cargo reads this file based on the *current directory*, so build from rust-ffi/.
+[build]
+rustflags = ["-C", "force-frame-pointers=yes"]

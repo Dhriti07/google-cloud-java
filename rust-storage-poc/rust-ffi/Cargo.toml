@@ -1,0 +1,24 @@
+[package]
+name = "gcs-rust-ffi"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "gcs_rust_ffi"
+crate-type = ["cdylib"]
+
+[dependencies]
+anyhow = "1.0"
+bytes = "1.12"
+# Published crate (not a local path) so the library builds reproducibly anywhere, e.g. the VM.
+google-cloud-storage = "1.20.0"
+# Already pulled in by google-cloud-storage; listed only to name its `NeverRetry` policy.
+google-cloud-gax = "1.15.0"
+jni = "0.21"
+tokio = { version = "1.53", features = ["rt"] }
+
+# Optimized build that stays debuggable in production: keep line tables so crash reports and
+# profilers show Rust function names/lines. Frame pointers are enabled in .cargo/config.toml.
+[profile.release]
+debug = "line-tables-only"

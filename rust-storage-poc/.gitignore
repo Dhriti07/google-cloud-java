@@ -1,0 +1,8 @@
+rust-ffi/target/
+java/target/
+bench/__pycache__/
+bench/results/
+*.so
+*.jar
+*.tar.gz
+*.log
