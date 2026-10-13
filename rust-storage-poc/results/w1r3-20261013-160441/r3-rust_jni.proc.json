@@ -1,0 +1,30 @@
+{
+  "cmd": [
+    "~/rust-poc/jdk25/bin/java",
+    "-Xms1g",
+    "-Xmx1g",
+    "-XX:+AlwaysPreTouch",
+    "-XX:MaxDirectMemorySize=1g",
+    "-Dio.grpc.netty.shaded.io.netty.maxDirectMemory=1073741824",
+    "--enable-native-access=ALL-UNNAMED",
+    "-cp",
+    "~/rust-poc/rust-storage-poc-bench.jar",
+    "com.google.cloud.storage.rustpoc.W1R3Benchmark",
+    "--impl=rust_jni",
+    "--bucket=<bucket>",
+    "--project=<project>",
+    "--lib=~/rust-poc/libgcs_rust_ffi.so",
+    "--iterations=200",
+    "--warmup=10",
+    "--read-mode=java",
+    "--seed=42",
+    "--prefix=gcs-rust-poc/w1r3/20261013-160441/r3/",
+    "--out=~/rust-poc/results/w1r3-20261013-160441/r3-rust_jni.csv"
+  ],
+  "exit_code": 0,
+  "wall_s": 300.676,
+  "user_s": 30.719,
+  "sys_s": 10.765,
+  "max_rss_kib": 1171180,
+  "stderr_bytes_total": 186
+}
