@@ -37,7 +37,7 @@ time = op time − SDK time; number of Java → Rust calls.
 |---|---|
 | `run_w1r3.sh` | runs everything and writes `summary.md` |
 | `summarize_w1r3.py` | summary tables and sanity checks |
-| `plot_w1r3.py` | graphs (needs matplotlib + numpy) |
+| `plot_w1r3.py`, `plot_compare.py` | graphs; side-by-side bar charts (need matplotlib + numpy) |
 | `timed_run.py` | per-process wall / CPU / max RSS |
 | `build_native.sh`, `measure_package_size.sh` | build the Rust library; measure package sizes |
 

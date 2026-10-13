@@ -78,6 +78,36 @@ p50 in ms. In brackets: the p50 of each of the 4 rounds.
   (p50 93 ms). The slowest `native_java` op was 17.2 s and the slowest `rust_panama` op 12.0 s. The
   cause was not investigated.
 
+![p50 latency per op: Java SDK vs Rust via JNI / Panama](results/w1r3-20261013-160441/graphs/compare_latency.png)
+
+### Rust SDK latency inside the JNI / Panama calls
+
+The Rust library times every call it makes into the Rust SDK, inside the same JNI / Panama call,
+so the two can be compared without network variation between them. p50 in ms. "Rust SDK" is the
+time spent inside the Rust SDK during the call (for reads: waiting for each next chunk).
+
+| size | op | native_java | rust_jni: whole call | rust_jni: Rust SDK | rust_panama: whole call | rust_panama: Rust SDK |
+|---|---|--:|--:|--:|--:|--:|
+| 100 KB | SINGLE-SHOT | 87.5 | 93.41 | 93.36 | 85.43 | 85.28 |
+| 100 KB | RESUMABLE | 165.0 | 170.84 | 170.79 | 164.85 | 164.70 |
+| 100 KB | READ | 44.5 | 44.37 | 44.31 | 43.85 | 43.74 |
+| 2 MiB | SINGLE-SHOT | 113.4 | 111.86 | 111.46 | 107.84 | 107.41 |
+| 2 MiB | RESUMABLE | 191.5 | 186.69 | 186.30 | 191.97 | 191.52 |
+| 2 MiB | READ | 57.7 | 57.63 | 57.31 | 57.05 | 56.61 |
+| 100 MB | SINGLE-SHOT | 1240 | 1303.80 | 1281.09 | 1196.61 | 1172.37 |
+| 100 MB | RESUMABLE | 1712 | 1294.87 | 1272.15 | 1301.30 | 1276.59 |
+| 100 MB | READ | 525 | 513.55 | 509.33 | 543.56 | 535.01 |
+
+- JNI and Panama add 0.05–0.46 ms per call, except 100 MB uploads (about 23–25 ms: copying the
+  `byte[]` into Rust) and 100 MB reads (4.3 ms JNI / 8.6 ms Panama).
+- The differences between JNI and Panama are in the Rust SDK column, not in the bridge (e.g. 100 KB
+  single-shot: 93.36 vs 85.28 ms inside the Rust SDK, with 0.05 vs 0.14 ms of bridge), so they are
+  network / run-to-run variation.
+- Each column's p50 is computed on its own, so "whole call − Rust SDK" can differ slightly from the
+  per-op bridge p50 in `summary.md`.
+
+![Where the time goes: inside the Rust SDK vs the bridge](results/w1r3-20261013-160441/graphs/compare_latency_breakdown.png)
+
 ![Latency ratio vs native_java, and process CPU ratio](results/w1r3-20261013-160441/graphs/0_overview_ratio_heatmap.png)
 
 More graphs per size (percentiles, CDF, p50 per round, every op over time) are in
@@ -99,6 +129,8 @@ to `native_java`. Measured the same way for all three.
 | 100 MB | SINGLE-SHOT | 0.66× | 0.69× |
 | 100 MB | RESUMABLE | 0.81× | 0.86× |
 | 100 MB | READ | **1.11×** | **1.22×** |
+
+![Whole-process CPU per byte: Java SDK vs Rust via JNI / Panama](results/w1r3-20261013-160441/graphs/compare_cpu.png)
 
 Whole run (`timed_run.py`, user + sys over all 4 rounds): `native_java` 270 s, `rust_jni` 162 s,
 `rust_panama` 180 s.
@@ -125,6 +157,8 @@ allocations (a counting global allocator in the Rust library).
 - Held memory (peak RSS growth during the op): 0 MiB for all three, except 100 MB uploads, where Rust
   grows by **95 MiB** (Java: 0). Peak RSS is 1142–1247 MiB for all three, dominated by the 1 GiB
   pre-touched Java heap.
+
+![Memory allocated and held: Java SDK vs Rust via JNI / Panama](results/w1r3-20261013-160441/graphs/compare_memory.png)
 
 **Bridge overhead** = op time minus time inside the Rust SDK, measured in the same op, so network
 time cancels out. p50:
@@ -161,60 +195,7 @@ Package size (Rust library stripped, release):
 macOS can't be built from Linux (it needs Apple's SDK). Today `google-cloud-storage-2.72.0.jar` is
 1.5 MB, and with all runtime dependencies a developer downloads 87 jars, 56.5 MB.
 
-## 6. Key challenges: Java column
-
-| Challenge | Java |
-|---|---|
-| **Mono Repo** | Users get pre-built jars, and jars already carry native code (e.g. `grpc-netty-shaded`, used by java-storage), so unlike Go nobody compiles Rust. The cost is ours: a new per-OS/CPU build, either in google-cloud-java or as a separate jar from the Rust side, pinned to one Rust version and coordinated with google-cloud-java's single repo-wide release. |
-| **Platform-specific issues** | **Medium risk:** Java SDK uses native code today but it's optional: if it can't load, the SDK falls back to pure Java and still works. A Rust core would be required, so the SDK only works on platforms we build it for. Each OS, CPU and Linux variant needs its own build. In the PoC, a build made on a newer Linux didn't run on older Linux (Debian 12); building against an older Linux library fixed it. Linux ARM, Alpine and Windows builds compile but haven't been run; macOS hasn't been built. The Rust part also has its own networking, so TLS and proxy settings made in Java don't reach it. |
-| **Platform reach** | **Needs alignment; Panama-only is a blocker, JNI is feasible.** java-storage supports Java 8+, and Panama needs [Java 22](https://openjdk.org/jeps/454). Since JDK 24, [JEP 472](https://openjdk.org/jeps/472) warns on JNI and Panama use, and a future release will require `--enable-native-access`. GraalVM native-image is supported today; JNI classes must be [listed in its config](https://www.graalvm.org/latest/reference-manual/native-image/dynamic-features/JNI/). Customers on platforms we don't build (e.g. IBM mainframe / Power) or on systems that block native code lose the SDK. |
-| **Package Size** | **Manageable risk:** The Rust library is 18–23 MB per platform, or 7–9 MB compressed in a jar, similar to what the Python and C++ PoCs measured. Today the Storage jar is 1.5 MB, and a developer downloads 56.5 MB in total with its dependencies. With one platform's library (Linux x86-64), the Storage jar grows to about 8.6 MB and the total download to 63.6 MB (+13%). With all five platforms, the Storage jar grows to 38.5 MB and the total download to 93.5 MB (+65%). |
-| **Tool chain, coordination and maintenance costs** | **High effort:** The SDK build needs Java (Maven), Rust (Cargo) and a C compiler. Measured on the same 8-core machine: changing one file and rebuilding takes 56 s for the Rust library vs 14 s for the Java Storage SDK; a from-scratch Rust build takes about 3 minutes, and its build folder is 1.1 GB. The Java–Rust glue is mostly hand-written: [UniFFI](https://github.com/mozilla/uniffi-rs), the usual generator, [officially supports Kotlin, Swift, Python and Ruby](https://github.com/mozilla/uniffi-rs/blob/main/uniffi_bindgen/src/bindings/mod.rs), not Java. Its Kotlin output runs on the JVM but [needs JNA](https://mozilla.github.io/uniffi-rs/latest/kotlin/gradle.html) and Kotlin in a Java SDK. The third-party [uniffi-bindgen-java](https://github.com/IronCoreLabs/uniffi-bindgen-java) (still unstable) and OpenJDK's [jextract](https://github.com/openjdk/jextract) only target [Panama, which needs Java 22+](https://openjdk.org/jeps/454). For JNI, which Java 8–21 needs, the glue stays hand-written. That glue is low-level, memory-unsafe code where mistakes crash the JVM, so the Java team needs Rust and JNI skills. |
-| **Impedance mismatches** | **Manageable:** Solved in PoC → blocking Java calls (the Rust SDK runs on the calling Java thread), streaming reads into Java heap `ByteBuffer`s, and uploads from `byte[]`, over both JNI and Panama. Not yet built: mapping Rust errors to `StorageException` and streaming `WriteChannel` uploads. **Open concerns:** options that take Java objects need a bridge or can't run on a Rust transport. Custom [`Credentials`](https://cloud.google.com/java/docs/reference/google-auth-library/latest/com.google.auth.Credentials) and [`StorageRetryStrategy`](https://cloud.google.com/java/docs/reference/google-cloud-storage/latest/com.google.cloud.storage.StorageRetryStrategy) need callbacks from Rust into Java. [`OpenTelemetry`](https://javadoc.io/doc/io.opentelemetry/opentelemetry-api/latest/io/opentelemetry/api/OpenTelemetry.html) spans from the Java API keep working, but spans for work inside Rust need a bridge. A custom HTTP transport ([`setHttpTransportFactory`](https://cloud.google.com/java/docs/reference/google-cloud-core/latest/com.google.cloud.http.HttpTransportOptions.Builder#com_google_cloud_http_HttpTransportOptions_Builder_setHttpTransportFactory_com_google_auth_http_HttpTransportFactory_)) and JVM proxy/trust-store settings don't reach Rust's networking unless the glue passes them across. |
-| **Harder debugging experience** | **High effort, not a blocker:** see §7. |
-
-## 7. Harder debugging experience
-
-**High effort, not a blocker:** The SDK's own code is Java today, so users debug it with the IDE
-debugger, `jstack`, JFR and heap dumps. With a Rust core, Java error traces stop where Java calls
-into Rust. To see the Rust side, you need native tools like gdb/lldb or
-[async-profiler](https://github.com/async-profiler/async-profiler). A bug in the Java–Rust glue can
-crash the whole JVM, leaving only a
-[crash log](https://docs.oracle.com/en/java/javase/21/troubleshoot/fatal-error-log.html) instead of
-a Java exception. Rust function names in that log add about 6 MB to the library (20 → 26 MB). Line
-numbers need debug info (114 MB), which would be kept separately. Rust panics (Rust's emergency
-stop) must be caught before they reach Java, or the
-[JVM aborts](https://blog.rust-lang.org/2024/09/05/Rust-1.81.0/). Rust logs don't show up in Java
-logs (SLF4J/JUL) unless we connect them. Java's memory tools
-([Native Memory Tracking](https://docs.oracle.com/en/java/javase/21/vm/native-memory-tracking.html),
-heap dumps) can't see memory used by Rust. JFR shows a thread is in native code but not which Rust
-function. A bug may sit in java-storage, the glue or google-cloud-rust, so triage crosses all three.
-
-What we checked in this PoC (on JDK 25):
-
-| Check | Result |
-|---|---|
-| Rust error thrown into Java | Stack trace ends at `JniGcsClient.nativeDeleteObject(Native Method)` |
-| Bad pointer passed to the glue | `SIGSEGV`, JVM exits with a fatal error log, no Java exception |
-| Same crash, library fully stripped (19.6 MB) | Internal Rust frames are bare addresses |
-| Same crash, symbols kept (25.6 MB) | Rust function names |
-| Same crash, line tables (114 MB) | Function names plus file and line |
-| JFR native sampling during a native call | Only the Java frame is recorded |
-
-## 8. Comparison with the other PoCs
-
-| | Python | Go | C++ | **Java** |
-|---|---|---|---|---|
-| Bridge | PyO3 | C ABI, static library | C ABI | C ABI (Panama) + JNI glue, shared library |
-| Calls | async, GIL released | async callbacks, streaming, cancellation | blocking | blocking, streaming reads |
-| Workload | own (range reads, writes, list) | own (write/read 1–512 MiB, concurrency) | w1r3 and others | w1r3 |
-| CPU vs native on reads ≥ 2 MiB | see report | see report | +50–55% | 2 MiB: −24 to −34%; 100 MB: +11% (JNI) / +22% (Panama) |
-| Uploads, allocations per byte | see report | see report | ~1 B/B | ~2 B/B (extra copy of the Java `byte[]`) |
-
-Every PoC used a different VM shape and region, so only ratios to each language's own SDK compare
-across languages.
-
-## 9. How the PoC is built
+## 6. How the PoC is built
 
 ```mermaid
 flowchart LR
@@ -246,7 +227,7 @@ flowchart LR
 - The library is built against glibc 2.17 (`cargo zigbuild`). A default build needed glibc 2.38+
   and `libgcc_s.so.1`, and failed to load on Debian 12.
 
-## 10. Set up and run
+## 7. Set up and run
 
 See [bench/README.md](bench/README.md). In short:
 
@@ -260,6 +241,7 @@ BUCKET=<bucket> ./run_w1r3.sh
 # Tables and graphs
 python3 bench/summarize_w1r3.py results/<run> > results/<run>/summary.md
 python3 bench/plot_w1r3.py results/<run> results/<run>/graphs
+python3 bench/plot_compare.py results/<run> results/<run>/graphs
 ```
 
 Raw results for this report: [results/w1r3-20261013-160441](results/w1r3-20261013-160441)
