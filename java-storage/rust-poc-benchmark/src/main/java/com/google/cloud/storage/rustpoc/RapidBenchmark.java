@@ -42,6 +42,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -50,11 +51,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -77,6 +80,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *       --list-items} items per call.
  * </ul>
  *
+ * <p>Connections: a Java {@code Storage} uses one gRPC connection; the Rust SDK opens one per CPU
+ * for the data path. {@code --clients=K} creates K {@code Storage} instances (worker t uses t % K),
+ * and {@code -Dgcs.rust.grpc.subchannels=N} sets the Rust connection count, so runs can be matched.
+ * Established TCP connections to port 443 and NIC Gbps are recorded under {@code params.network}.
+ *
  * <p>Latency is measured around the outermost API call(s) of each operation; operations that end in
  * the warm-up are not counted. Results go to {@code --out/<workload>-<engine>-<time>/}.
  */
@@ -92,11 +100,17 @@ public final class RapidBenchmark {
   private final int threads;
   private final int durationSec;
   private final int warmupSec;
+  // Number of Storage instances; thread t uses instance t % clients. A Java Storage has one gRPC
+  // connection, so this is how a Java user gets more connections.
+  private final int clients;
   private final long objectSize;
   private final int rangeSize;
   private final int writeChunk;
   private final int listItems;
   private final Path out;
+  // Free-form configuration name for the results table, e.g. "rust-default".
+  private final String label;
+  private final List<Storage> pool = new ArrayList<>();
 
   private RapidBenchmark(Map<String, String> args) {
     this.args = args;
@@ -106,12 +120,14 @@ public final class RapidBenchmark {
     this.project = arg("project", "");
     this.threads = Integer.parseInt(arg("threads", workload.startsWith("list") ? "1" : "48"));
     this.durationSec = Integer.parseInt(arg("duration", "300"));
-    this.warmupSec = Integer.parseInt(arg("warmup", "10"));
+    this.warmupSec = Integer.parseInt(arg("warmup", workload.startsWith("list") ? "10" : "30"));
+    this.clients = Integer.parseInt(arg("clients", "1"));
     this.objectSize = Long.parseLong(arg("object-size", String.valueOf(200_000_000L)));
     this.rangeSize = Integer.parseInt(arg("range-size", String.valueOf(16 * MiB)));
     this.writeChunk = Integer.parseInt(arg("write-chunk", String.valueOf(2 * MiB)));
     this.listItems = Integer.parseInt(arg("list-items", "100"));
-    String run = workload + "-" + engine + "-" + Instant.now().toString().replace(':', '-');
+    this.label = arg("label", engine);
+    String run = workload + "-" + label + "-" + Instant.now().toString().replace(':', '-');
     this.out = Paths.get(arg("out", "results"), run);
   }
 
@@ -132,7 +148,12 @@ public final class RapidBenchmark {
     if (!project.isEmpty()) {
       b.setProjectId(project);
     }
-    try (Storage storage = b.build().getService()) {
+    StorageOptions options = b.build();
+    for (int i = 0; i < clients; i++) {
+      pool.add(options.toBuilder().build().getService());
+    }
+    Storage storage = pool.get(0);
+    try {
       switch (workload) {
         case "read":
           runRead(storage);
@@ -149,7 +170,16 @@ public final class RapidBenchmark {
         default:
           throw new IllegalArgumentException("unknown --workload=" + workload);
       }
+    } finally {
+      for (Storage s : pool) {
+        s.close();
+      }
     }
+  }
+
+  /** The Storage instance a worker thread uses. */
+  private Storage storageFor(int thread) {
+    return pool.get(thread % pool.size());
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -177,7 +207,8 @@ public final class RapidBenchmark {
     runTimed(
         "BIDI_READ",
         thread -> {
-          BlobReadSession session = storage.blobReadSession(id).get(60, TimeUnit.SECONDS);
+          BlobReadSession session =
+              storageFor(thread).blobReadSession(id).get(60, TimeUnit.SECONDS);
           Random rnd = new Random(thread);
           return new Op() {
             @Override
@@ -207,7 +238,8 @@ public final class RapidBenchmark {
 
   private void runWrite(Storage storage) throws Exception {
     ByteBuffer payload = randomPayload(objectSize);
-    String prefix = arg("prefix", "rust-poc-write-" + engine + "-" + System.currentTimeMillis() + "/");
+    String prefix =
+        arg("prefix", "rust-poc-write-" + engine + "-" + System.currentTimeMillis() + "/");
     List<BlobId> created = Collections.synchronizedList(new ArrayList<>());
     String[] uploadClass = {""};
     Map<String, Object> params = new LinkedHashMap<>();
@@ -221,11 +253,12 @@ public final class RapidBenchmark {
           return () -> {
             BlobInfo info = BlobInfo.newBuilder(bucket, prefix + thread + "-" + seq[0]++).build();
             BlobAppendableUpload upload =
-                storage.blobAppendableUpload(
-                    info,
-                    BlobAppendableUploadConfig.of()
-                        .withCloseAction(CloseAction.FINALIZE_WHEN_CLOSING),
-                    BlobWriteOption.doesNotExist());
+                storageFor(thread)
+                    .blobAppendableUpload(
+                        info,
+                        BlobAppendableUploadConfig.of()
+                            .withCloseAction(CloseAction.FINALIZE_WHEN_CLOSING),
+                        BlobWriteOption.doesNotExist());
             uploadClass[0] = upload.getClass().getSimpleName();
             writeAll(upload, payload);
             BlobInfo done = upload.getResult().get(10, TimeUnit.MINUTES);
@@ -281,8 +314,11 @@ public final class RapidBenchmark {
             () -> {
               long n = 0;
               Page<Blob> page =
-                  storage.list(
-                      bucket, BlobListOption.prefix(prefix), BlobListOption.pageSize(listItems));
+                  storageFor(thread)
+                      .list(
+                          bucket,
+                          BlobListOption.prefix(prefix),
+                          BlobListOption.pageSize(listItems));
               for (Blob ignored : page.getValues()) {
                 n++;
               }
@@ -303,7 +339,8 @@ public final class RapidBenchmark {
         thread ->
             () -> {
               long n = 0;
-              for (Bucket ignored : storage.list(BucketListOption.pageSize(listItems)).getValues()) {
+              for (Bucket ignored :
+                  storageFor(thread).list(BucketListOption.pageSize(listItems)).getValues()) {
                 n++;
               }
               return n;
@@ -389,8 +426,7 @@ public final class RapidBenchmark {
     }
   }
 
-  private void runTimed(String op, OpFactory factory, Map<String, Object> params)
-      throws Exception {
+  private void runTimed(String op, OpFactory factory, Map<String, Object> params) throws Exception {
     runTimed(op, factory, params, () -> {});
   }
 
@@ -453,9 +489,15 @@ public final class RapidBenchmark {
     long measureStart = System.nanoTime();
     Instant windowStart = Instant.now();
     long cpuStart = os.getProcessCpuTime();
-    Thread.sleep(TimeUnit.SECONDS.toMillis(durationSec));
+    long[] nicStart = nicBytes();
+    int tcpAtStart = established443();
+    Thread.sleep(TimeUnit.SECONDS.toMillis(durationSec / 2));
+    int tcpMid = established443();
+    Thread.sleep(TimeUnit.SECONDS.toMillis(durationSec - durationSec / 2));
     long measureEnd = System.nanoTime();
     Instant windowEnd = Instant.now();
+    long[] nicEnd = nicBytes();
+    int tcpAtEnd = established443();
     double cpuPct =
         100.0
             * (os.getProcessCpuTime() - cpuStart)
@@ -466,7 +508,74 @@ public final class RapidBenchmark {
       w.join();
     }
     before.run();
+    double secs = (measureEnd - measureStart) / 1e9;
+    Map<String, Object> net = new LinkedHashMap<>();
+    net.put("tcp_established_443_start", tcpAtStart);
+    net.put("tcp_established_443_mid", tcpMid);
+    net.put("tcp_established_443_end", tcpAtEnd);
+    net.put("nic_rx_Gbps", (nicEnd[0] - nicStart[0]) * 8 / secs / 1e9);
+    net.put("nic_tx_Gbps", (nicEnd[1] - nicStart[1]) * 8 / secs / 1e9);
+    params.put("network", net);
     report(op, logs, t0, measureStart, measureEnd, windowStart, windowEnd, cpuPct, params);
+  }
+
+  /**
+   * Established TCP connections from this process to remote port 443 (the GCS endpoint), from
+   * /proc/self/fd and /proc/net/tcp{,6}. Shows how many connections each engine really opened. -1
+   * if unavailable.
+   */
+  private static int established443() {
+    // Socket inodes owned by this process, so other programs' connections are not counted.
+    Set<String> mine = new HashSet<>();
+    try (DirectoryStream<Path> fds = Files.newDirectoryStream(Paths.get("/proc/self/fd"))) {
+      for (Path fd : fds) {
+        try {
+          String target = Files.readSymbolicLink(fd).toString();
+          if (target.startsWith("socket:[")) {
+            mine.add(target.substring(8, target.length() - 1));
+          }
+        } catch (IOException ignored) {
+          // fd closed while listing
+        }
+      }
+    } catch (IOException e) {
+      return -1;
+    }
+    int n = 0;
+    for (String f : new String[] {"/proc/net/tcp", "/proc/net/tcp6"}) {
+      try {
+        for (String line : Files.readAllLines(Paths.get(f))) {
+          String[] c = line.trim().split("\\s+");
+          // c[2] = remote "ADDR:PORT" in hex, c[3] = state (01 = ESTABLISHED), c[9] = inode.
+          if (c.length > 9 && c[2].endsWith(":01BB") && c[3].equals("01") && mine.contains(c[9])) {
+            n++;
+          }
+        }
+      } catch (IOException e) {
+        return -1;
+      }
+    }
+    return n;
+  }
+
+  /** Total [rx, tx] bytes over all non-loopback interfaces, from /proc/net/dev. */
+  private static long[] nicBytes() {
+    long rx = 0;
+    long tx = 0;
+    try {
+      for (String line : Files.readAllLines(Paths.get("/proc/net/dev"))) {
+        int colon = line.indexOf(':');
+        if (colon < 0 || line.substring(0, colon).trim().equals("lo")) {
+          continue;
+        }
+        String[] c = line.substring(colon + 1).trim().split("\\s+");
+        rx += Long.parseLong(c[0]);
+        tx += Long.parseLong(c[8]);
+      }
+    } catch (IOException | RuntimeException e) {
+      return new long[] {0, 0};
+    }
+    return new long[] {rx, tx};
   }
 
   private void report(
@@ -529,8 +638,12 @@ public final class RapidBenchmark {
     Map<String, Object> s = new LinkedHashMap<>();
     s.put("op", op);
     s.put("engine", engine);
+    s.put("label", label);
     s.put("bucket", bucket);
     s.put("threads", threads);
+    s.put("clients", clients);
+    s.put("rust_grpc_subchannels", System.getProperty("gcs.rust.grpc.subchannels", "sdk-default"));
+    s.put("jvm_args", ManagementFactory.getRuntimeMXBean().getInputArguments());
     s.put("params", params);
     s.put("window_start", windowStart.toString());
     s.put("window_end", windowEnd.toString());
