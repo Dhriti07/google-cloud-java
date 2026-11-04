@@ -51,8 +51,6 @@ pub(crate) mod google {
 use google::storage::v2 as pb;
 
 /// Encodes an SDK object as `google.storage.v2.Object` bytes for Java.
-// Used by the Bidi Read commit that follows.
-#[allow(dead_code)]
 pub(crate) fn encode_object(o: &model::Object) -> Vec<u8> {
     object(o).encode_to_vec()
 }

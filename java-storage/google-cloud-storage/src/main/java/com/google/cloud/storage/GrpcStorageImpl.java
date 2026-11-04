@@ -181,6 +181,9 @@ final class GrpcStorageImpl extends BaseService<StorageOptions>
   private final Opts<UserProject> defaultOpts;
   @Deprecated private final Supplier<ProjectId> defaultProjectId;
 
+  // Local PoC: set only when -Dgcs.rust.lib is set; otherwise every call takes the Java path.
+  private final @Nullable RustClient rust;
+
   GrpcStorageImpl(
       GrpcStorageOptions options,
       StorageClient storageClient,
@@ -200,6 +203,7 @@ final class GrpcStorageImpl extends BaseService<StorageOptions>
     this.retryAlgorithmManager = options.getRetryAlgorithmManager();
     this.syntaxDecoders = new SyntaxDecoders();
     this.defaultProjectId = Suppliers.memoize(() -> UnifiedOpts.projectId(options.getProjectId()));
+    this.rust = RustNative.isConfigured() ? RustClient.create(null) : null;
   }
 
   @Override
@@ -209,6 +213,10 @@ final class GrpcStorageImpl extends BaseService<StorageOptions>
       s.shutdownNow();
       java.time.Duration terminationAwaitDuration = getOptions().getTerminationAwaitDuration();
       s.awaitTermination(terminationAwaitDuration.toMillis(), TimeUnit.MILLISECONDS);
+    } finally {
+      if (rust != null) {
+        rust.close();
+      }
     }
   }
 
@@ -1482,6 +1490,10 @@ final class GrpcStorageImpl extends BaseService<StorageOptions>
     b.setReadObjectSpec(spec);
     opts.bidiReadObjectRequest().apply(b);
     BidiReadObjectRequest req = b.build();
+
+    if (rust != null) {
+      return RustBlobReadSession.open(rust, req.getReadObjectSpec());
+    }
 
     GrpcCallContext context = opts.grpcMetadataMapper().apply(GrpcCallContext.createDefault());
     ApiFuture<ObjectReadSession> session = storageDataClient.readSession(req, context);

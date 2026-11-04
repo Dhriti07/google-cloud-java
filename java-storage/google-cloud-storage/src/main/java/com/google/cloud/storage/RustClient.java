@@ -16,6 +16,10 @@
 
 package com.google.cloud.storage;
 
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
@@ -27,8 +31,19 @@ final class RustClient implements AutoCloseable {
 
   private final AtomicLong handle;
 
+  // Runs future completions handed over from Rust threads (see RustCompletion).
+  private final ExecutorService callbackExecutor;
+
   private RustClient(long handle) {
     this.handle = new AtomicLong(handle);
+    AtomicInteger n = new AtomicInteger();
+    this.callbackExecutor =
+        Executors.newCachedThreadPool(
+            r -> {
+              Thread t = new Thread(r, "gcs-rust-callback-" + n.incrementAndGet());
+              t.setDaemon(true);
+              return t;
+            });
   }
 
   /** {@code endpoint} may be null for the default endpoint. */
@@ -50,11 +65,16 @@ final class RustClient implements AutoCloseable {
     return h;
   }
 
+  Executor callbackExecutor() {
+    return callbackExecutor;
+  }
+
   @Override
   public void close() {
     long h = handle.getAndSet(0);
     if (h != 0) {
       RustNative.clientClose(h);
+      callbackExecutor.shutdown();
     }
   }
 }

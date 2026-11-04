@@ -32,6 +32,12 @@ final class RustNative {
 
   private RustNative() {}
 
+  /** True when the Rust connector is switched on with {@code -Dgcs.rust.lib}. */
+  static boolean isConfigured() {
+    String path = System.getProperty(LIBRARY_PROPERTY);
+    return path != null && !path.isEmpty();
+  }
+
   static synchronized void ensureLoaded() {
     if (loaded) {
       return;
@@ -52,4 +58,22 @@ final class RustNative {
 
   /** Frees a handle from {@link #clientNew}. Must be called exactly once per handle. */
   static native void clientClose(long handle);
+
+  /**
+   * Opens a Bidi Read session. Completes with (session handle, {@code google.storage.v2.Object}
+   * bytes). {@code preconditions}: [generation, ifGenerationMatch, ifGenerationNotMatch,
+   * ifMetagenerationMatch, ifMetagenerationNotMatch], {@code Long.MIN_VALUE} for "not set".
+   */
+  static native void readSessionOpen(
+      long client, String bucket, String object, long[] preconditions, RustCompletion completion);
+
+  /**
+   * Reads {@code [offset, offset + length)} into {@code dst}. Completes with the number of bytes
+   * read. {@code length} must be greater than 0.
+   */
+  static native void rangeRead(
+      long client, long session, long offset, long length, byte[] dst, RustCompletion completion);
+
+  /** Frees a session from {@link #readSessionOpen}. Must be called exactly once per session. */
+  static native void readSessionClose(long session);
 }

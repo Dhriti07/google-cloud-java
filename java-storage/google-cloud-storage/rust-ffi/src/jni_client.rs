@@ -64,6 +64,24 @@ pub(crate) fn run<'local, T>(
     }
 }
 
+/// The client behind a handle from `clientNew`.
+pub(crate) fn client<'a>(handle: jlong) -> FfiResult<&'a Client> {
+    if handle == 0 {
+        Err(FfiError::internal("null client handle"))
+    } else {
+        // Safety: a live handle from clientNew; Java frees it only after all calls finish.
+        Ok(unsafe { &*(handle as *const Client) })
+    }
+}
+
+/// Copies a non-null Java string.
+pub(crate) fn java_string(env: &mut JNIEnv, s: &JString) -> FfiResult<String> {
+    if s.is_null() {
+        return Err(FfiError::internal("null string argument"));
+    }
+    Ok(env.get_string(s)?.into())
+}
+
 /// Creates a client. Returns an opaque handle that Java must pass to `clientClose` exactly once.
 /// `endpoint` may be null for the default endpoint.
 #[unsafe(no_mangle)]
@@ -76,11 +94,7 @@ pub extern "system" fn Java_com_google_cloud_storage_RustNative_clientNew<'local
         let endpoint = if endpoint.is_null() {
             None
         } else {
-            let s: String = env
-                .get_string(&endpoint)
-                .map_err(|e| FfiError::internal(format!("failed to read endpoint: {e}")))?
-                .into();
-            Some(s)
+            Some(java_string(env, &endpoint)?)
         };
         let client = Client::new(endpoint)?;
         Ok(Box::into_raw(Box::new(client)) as jlong)

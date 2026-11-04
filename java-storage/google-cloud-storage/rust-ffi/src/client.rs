@@ -22,11 +22,9 @@ use tokio::runtime::{Builder, Runtime};
 /// other gRPC calls (list objects, list buckets). Both share one multi-threaded Tokio runtime,
 /// the setup a Rust application would use.
 pub(crate) struct Client {
-    // Used by the feature PRs that follow.
-    #[allow(dead_code)]
     pub(crate) rt: Runtime,
-    #[allow(dead_code)]
     pub(crate) storage: Storage,
+    // Used by the List commits that follow.
     #[allow(dead_code)]
     pub(crate) control: StorageControl,
 }

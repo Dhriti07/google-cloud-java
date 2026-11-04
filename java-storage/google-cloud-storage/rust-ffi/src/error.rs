@@ -49,6 +49,12 @@ impl From<google_cloud_storage::Error> for FfiError {
     }
 }
 
+impl From<jni::errors::Error> for FfiError {
+    fn from(e: jni::errors::Error) -> Self {
+        Self::internal(format!("JNI error: {e}"))
+    }
+}
+
 /// Runs `f` and turns a Rust panic into an error. A panic must never unwind into the JVM, so
 /// every JNI entry point goes through this.
 pub(crate) fn guarded<T>(name: &str, f: impl FnOnce() -> FfiResult<T>) -> FfiResult<T> {
@@ -61,7 +67,7 @@ pub(crate) fn guarded<T>(name: &str, f: impl FnOnce() -> FfiResult<T>) -> FfiRes
     }
 }
 
-fn panic_message(payload: &(dyn Any + Send)) -> String {
+pub(crate) fn panic_message(payload: &(dyn Any + Send)) -> String {
     if let Some(s) = payload.downcast_ref::<&str>() {
         (*s).to_string()
     } else if let Some(s) = payload.downcast_ref::<String>() {
