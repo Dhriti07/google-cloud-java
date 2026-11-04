@@ -1,0 +1,22 @@
+[package]
+name = "gcs-rust-ffi"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Local PoC: lets java-storage call the Rust Storage SDK through JNI.
+# Build: cargo build --release   ->   target/release/libgcs_rust_ffi.so
+# Java loads it from -Dgcs.rust.lib=<path to the .so>.
+
+[lib]
+name = "gcs_rust_ffi"
+crate-type = ["cdylib"]
+
+[dependencies]
+# The released Rust Storage SDK, used as-is.
+google-cloud-storage = "1.20.0"
+jni = "0.21"
+tokio = { version = "1.53", features = ["rt-multi-thread"] }
+
+[dev-dependencies]
+google-cloud-gax = "1.15.0"
