@@ -106,4 +106,10 @@ final class RustNative {
 
   /** Frees an appender. Must be called exactly once per appender. */
   static native void appendableFree(long appender);
+
+  /**
+   * Fetches one page of List Objects. Takes {@code google.storage.v2.ListObjectsRequest} bytes and
+   * returns {@code google.storage.v2.ListObjectsResponse} bytes. Blocks until the page arrives.
+   */
+  static native byte[] listObjects(long client, byte[] listObjectsRequest);
 }

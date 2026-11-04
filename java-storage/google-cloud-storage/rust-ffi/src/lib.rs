@@ -21,6 +21,7 @@ mod callback;
 mod client;
 mod error;
 mod jni_client;
+mod lists;
 mod proto;
 mod read_session;
 mod write_session;

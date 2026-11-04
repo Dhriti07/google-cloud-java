@@ -504,6 +504,10 @@ final class GrpcStorageImpl extends BaseService<StorageOptions>
     ListObjectsRequest.Builder builder =
         ListObjectsRequest.newBuilder().setParent(bucketNameCodec.encode(bucket));
     ListObjectsRequest req = opts.listObjectsRequest().apply(builder).build();
+    if (rust != null) {
+      return new ListObjectsWithSyntheticDirectoriesPage(
+          grpcCallContext, req, RustLists.listObjects(rust, req));
+    }
     try {
       GrpcCallContext merge = Utils.merge(grpcCallContext, Retrying.newCallContext());
       return retrier.run(
@@ -1605,6 +1609,10 @@ final class GrpcStorageImpl extends BaseService<StorageOptions>
     public Page<Blob> getNextPage() {
       ListObjectsRequest nextPageReq =
           req.toBuilder().setPageToken(resp.getNextPageToken()).build();
+      if (rust != null) {
+        return new ListObjectsWithSyntheticDirectoriesPage(
+            ctx, nextPageReq, RustLists.listObjects(rust, nextPageReq));
+      }
       try {
         GrpcCallContext merge = Utils.merge(ctx, Retrying.newCallContext());
         ListObjectsResponse nextPageResp =

@@ -55,6 +55,42 @@ pub(crate) fn encode_object(o: &model::Object) -> Vec<u8> {
     object(o).encode_to_vec()
 }
 
+/// Decodes a `google.storage.v2.ListObjectsRequest` from Java (built by java-storage's own
+/// option mapping) into the SDK's request type.
+pub(crate) fn list_objects_request(
+    bytes: &[u8],
+) -> Result<model::ListObjectsRequest, prost::DecodeError> {
+    let r = pb::ListObjectsRequest::decode(bytes)?;
+    let mut m = model::ListObjectsRequest::new()
+        .set_parent(r.parent)
+        .set_page_size(r.page_size)
+        .set_page_token(r.page_token)
+        .set_delimiter(r.delimiter)
+        .set_include_trailing_delimiter(r.include_trailing_delimiter)
+        .set_prefix(r.prefix)
+        .set_versions(r.versions)
+        .set_lexicographic_start(r.lexicographic_start)
+        .set_lexicographic_end(r.lexicographic_end)
+        .set_soft_deleted(r.soft_deleted)
+        .set_include_folders_as_prefixes(r.include_folders_as_prefixes)
+        .set_match_glob(r.match_glob)
+        .set_filter(r.filter);
+    if let Some(mask) = r.read_mask {
+        m = m.set_read_mask(google_cloud_wkt::FieldMask::default().set_paths(mask.paths));
+    }
+    Ok(m)
+}
+
+/// Encodes an SDK list response as `google.storage.v2.ListObjectsResponse` bytes for Java.
+pub(crate) fn encode_list_objects_response(r: &model::ListObjectsResponse) -> Vec<u8> {
+    pb::ListObjectsResponse {
+        objects: r.objects.iter().map(object).collect(),
+        prefixes: r.prefixes.clone(),
+        next_page_token: r.next_page_token.clone(),
+    }
+    .encode_to_vec()
+}
+
 /// Field-by-field copy of the SDK model into the protobuf type.
 ///
 /// Not copied: `acl` (the gRPC API doesn't return it unless asked through the read mask),
@@ -192,6 +228,60 @@ mod tests {
         let e = p.customer_encryption.unwrap();
         assert_eq!(e.encryption_algorithm, "AES256");
         assert_eq!(e.key_sha256_bytes.len(), 32);
+    }
+
+    #[test]
+    fn list_request_round_trips_every_field() {
+        let java = pb::ListObjectsRequest {
+            parent: "projects/_/buckets/b".into(),
+            page_size: 100,
+            page_token: "tok".into(),
+            delimiter: "/".into(),
+            include_trailing_delimiter: true,
+            prefix: "p/".into(),
+            versions: true,
+            read_mask: Some(prost_types::FieldMask {
+                paths: vec!["name".into(), "size".into()],
+            }),
+            lexicographic_start: "a".into(),
+            lexicographic_end: "z".into(),
+            soft_deleted: true,
+            include_folders_as_prefixes: true,
+            match_glob: "**.txt".into(),
+            filter: "f".into(),
+        };
+        let m = list_objects_request(&java.encode_to_vec()).unwrap();
+
+        assert_eq!(m.parent, "projects/_/buckets/b");
+        assert_eq!(m.page_size, 100);
+        assert_eq!(m.page_token, "tok");
+        assert_eq!(m.delimiter, "/");
+        assert!(m.include_trailing_delimiter);
+        assert_eq!(m.prefix, "p/");
+        assert!(m.versions);
+        assert_eq!(m.read_mask.unwrap().paths, vec!["name", "size"]);
+        assert_eq!(m.lexicographic_start, "a");
+        assert_eq!(m.lexicographic_end, "z");
+        assert!(m.soft_deleted);
+        assert!(m.include_folders_as_prefixes);
+        assert_eq!(m.match_glob, "**.txt");
+        assert_eq!(m.filter, "f");
+    }
+
+    #[test]
+    fn list_response_round_trips() {
+        let resp = model::ListObjectsResponse::new()
+            .set_objects([full_object(), model::Object::new().set_name("b")])
+            .set_prefixes(["dir/"])
+            .set_next_page_token("next");
+        let p = pb::ListObjectsResponse::decode(encode_list_objects_response(&resp).as_slice())
+            .unwrap();
+
+        assert_eq!(p.objects.len(), 2);
+        assert_eq!(p.objects[0].size, 16_777_216);
+        assert_eq!(p.objects[1].name, "b");
+        assert_eq!(p.prefixes, vec!["dir/"]);
+        assert_eq!(p.next_page_token, "next");
     }
 
     #[test]

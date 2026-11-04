@@ -24,8 +24,6 @@ use tokio::runtime::{Builder, Runtime};
 pub(crate) struct Client {
     pub(crate) rt: Runtime,
     pub(crate) storage: Storage,
-    // Used by the List commits that follow.
-    #[allow(dead_code)]
     pub(crate) control: StorageControl,
 }
 
