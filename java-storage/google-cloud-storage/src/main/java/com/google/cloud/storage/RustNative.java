@@ -118,4 +118,21 @@ final class RustNative {
    * returns {@code google.storage.v2.ListBucketsResponse} bytes. Blocks until the page arrives.
    */
   static native byte[] listBuckets(long client, byte[] listBucketsRequest);
+
+  /**
+   * Opens a JSON read for {@code google.storage.v2.ReadObjectRequest} bytes (including the range).
+   * Blocks until the response starts. Writes the sparse object metadata ({@code
+   * google.storage.v2.Object} bytes) to {@code metadataOut[0]}. Returns the reader handle.
+   */
+  static native long jsonReaderOpen(long client, byte[] readObjectRequest, byte[][] metadataOut);
+
+  /** Copies up to {@code len} bytes into {@code dst[off..]}. Returns the count, -1 at the end. */
+  static native int jsonReaderReadArray(long client, long reader, byte[] dst, int off, int len);
+
+  /** Same as {@link #jsonReaderReadArray}, into a direct buffer. */
+  static native int jsonReaderReadDirect(
+      long client, long reader, ByteBuffer dst, int off, int len);
+
+  /** Frees a reader. Must be called exactly once per reader. */
+  static native void jsonReaderFree(long reader);
 }
