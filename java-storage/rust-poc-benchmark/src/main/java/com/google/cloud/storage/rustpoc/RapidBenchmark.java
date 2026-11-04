@@ -27,6 +27,7 @@ import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.BlobReadSession;
 import com.google.cloud.storage.Bucket;
+import com.google.cloud.storage.GrpcStorageOptions;
 import com.google.cloud.storage.RangeSpec;
 import com.google.cloud.storage.ReadProjectionConfigs;
 import com.google.cloud.storage.Storage;
@@ -62,6 +63,7 @@ import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.LongAdder;
 
 /**
  * Rapid workloads 4, 5 and 6 through the normal java-storage API.
@@ -111,6 +113,10 @@ public final class RapidBenchmark {
   // Free-form configuration name for the results table, e.g. "rust-default".
   private final String label;
   private final List<Storage> pool = new ArrayList<>();
+  // Bytes accepted by write channels. A 200 MB upload can take most of a minute, so write
+  // throughput comes from the bytes written inside the window, not from completed objects.
+  private final LongAdder bytesWritten = new LongAdder();
+  private long windowBytesWritten = -1;
 
   private RapidBenchmark(Map<String, String> args) {
     this.args = args;
@@ -144,7 +150,10 @@ public final class RapidBenchmark {
 
   private void run() throws Exception {
     Files.createDirectories(out);
-    StorageOptions.Builder b = StorageOptions.grpc().setAttemptDirectPath(false);
+    // Java's built-in gRPC client metrics are off: they only record calls on the Java channel, so
+    // leaving them on would add a cost to the Java runs that the Rust runs don't pay.
+    GrpcStorageOptions.Builder b =
+        StorageOptions.grpc().setAttemptDirectPath(false).setEnableGrpcClientMetrics(false);
     if (!project.isEmpty()) {
       b.setProjectId(project);
     }
@@ -285,7 +294,7 @@ public final class RapidBenchmark {
         slice.limit(Math.min(writeChunk, src.remaining()));
         int n = slice.remaining();
         while (slice.hasRemaining()) {
-          ch.write(slice);
+          bytesWritten.add(ch.write(slice));
         }
         src.position(src.position() + n);
       }
@@ -489,6 +498,7 @@ public final class RapidBenchmark {
     long measureStart = System.nanoTime();
     Instant windowStart = Instant.now();
     long cpuStart = os.getProcessCpuTime();
+    long writtenStart = bytesWritten.sum();
     long[] nicStart = nicBytes();
     int tcpAtStart = established443();
     Thread.sleep(TimeUnit.SECONDS.toMillis(durationSec / 2));
@@ -496,6 +506,7 @@ public final class RapidBenchmark {
     Thread.sleep(TimeUnit.SECONDS.toMillis(durationSec - durationSec / 2));
     long measureEnd = System.nanoTime();
     Instant windowEnd = Instant.now();
+    long writtenEnd = bytesWritten.sum();
     long[] nicEnd = nicBytes();
     int tcpAtEnd = established443();
     double cpuPct =
@@ -516,6 +527,9 @@ public final class RapidBenchmark {
     net.put("nic_rx_Gbps", (nicEnd[0] - nicStart[0]) * 8 / secs / 1e9);
     net.put("nic_tx_Gbps", (nicEnd[1] - nicStart[1]) * 8 / secs / 1e9);
     params.put("network", net);
+    if (op.equals("BIDI_APPENDABLE_WRITE")) {
+      windowBytesWritten = writtenEnd - writtenStart;
+    }
     report(op, logs, t0, measureStart, measureEnd, windowStart, windowEnd, cpuPct, params);
   }
 
@@ -660,6 +674,11 @@ public final class RapidBenchmark {
     s.put("ops_per_sec", k / secs);
     if (list) {
       s.put("items_per_sec", amount / secs);
+    } else if (windowBytesWritten >= 0) {
+      s.put("bytes", windowBytesWritten);
+      s.put("throughput_MBps", windowBytesWritten / secs / 1e6);
+      s.put("throughput_Gbps", windowBytesWritten * 8 / secs / 1e9);
+      s.put("completed_objects_Gbps", amount * 8 / secs / 1e9);
     } else {
       s.put("bytes", amount);
       s.put("throughput_MBps", amount / secs / 1e6);
