@@ -23,3 +23,4 @@ mod error;
 mod jni_client;
 mod proto;
 mod read_session;
+mod write_session;

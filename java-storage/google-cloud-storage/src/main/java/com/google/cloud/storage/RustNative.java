@@ -16,6 +16,7 @@
 
 package com.google.cloud.storage;
 
+import java.nio.ByteBuffer;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
@@ -76,4 +77,33 @@ final class RustNative {
 
   /** Frees a session from {@link #readSessionOpen}. Must be called exactly once per session. */
   static native void readSessionClose(long session);
+
+  /**
+   * Opens a Bidi Appendable Write for {@code writeObjectSpec} ({@code google.storage.v2
+   * .WriteObjectSpec} bytes). Blocks until the stream is open. Returns the appender handle.
+   */
+  static native long appendableOpen(long client, byte[] writeObjectSpec);
+
+  /** Appends {@code src[off, off+len)}, copied once into Rust. Blocks until Rust accepts it. */
+  static native void appendableAppendArray(
+      long client, long appender, byte[] src, int off, int len);
+
+  /** Appends {@code src[off, off+len)} of a direct buffer, copied once into Rust. */
+  static native void appendableAppendDirect(
+      long client, long appender, ByteBuffer src, int off, int len);
+
+  /** Blocks until everything appended is persisted. Returns the persisted size. */
+  static native long appendableFlush(long client, long appender);
+
+  /** Finalizes the object. Returns its {@code google.storage.v2.Object} bytes. */
+  static native byte[] appendableFinalize(long client, long appender);
+
+  /** Closes without finalizing. Returns the persisted size. */
+  static native long appendableClose(long client, long appender);
+
+  /** The generation of the object being written. */
+  static native long appendableGeneration(long appender);
+
+  /** Frees an appender. Must be called exactly once per appender. */
+  static native void appendableFree(long appender);
 }

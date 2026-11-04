@@ -1,0 +1,6 @@
+# Turns on the Rust SDK's (still unstable) appendable uploads, `open_appendable_object`
+# (gRPC BidiWriteObject), used for blobAppendableUpload. This only switches on code already in
+# the released crate; it doesn't change the crate. Cargo reads this file when building from
+# this directory.
+[build]
+rustflags = ["--cfg", "google_cloud_unstable_storage_bidi"]

@@ -1447,6 +1447,13 @@ final class GrpcStorageImpl extends BaseService<StorageOptions>
   public BlobAppendableUpload blobAppendableUpload(
       BlobInfo blobInfo, BlobAppendableUploadConfig uploadConfig, BlobWriteOption... options) {
     Opts<ObjectTargetOpt> opts = Opts.unwrap(options).resolveFrom(blobInfo);
+    if (rust != null) {
+      return RustBlobAppendableUpload.create(
+          rust,
+          blobInfo,
+          uploadConfig,
+          getBidiWriteObjectRequest(blobInfo, opts, /* appendable= */ true).getWriteObjectSpec());
+    }
     return uploadConfig.create(this, blobInfo, opts);
   }
 
