@@ -13,20 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Sets up a fresh Ubuntu GCE VM and builds everything the benchmark needs, on the VM itself:
-# the branch's google-cloud-storage, the Rust connector (release build) and the benchmark jar.
+# Sets up a fresh Ubuntu GCE VM: installs the tools, clones the branch, builds the Rust connector
+# (release) on the VM and downloads the benchmark jar.
 #
-# Usage (on the VM):
+# The jar is a self-contained (shaded) build of this branch's google-cloud-storage plus the
+# benchmark, made with `mvn package` in java-storage/rust-poc-benchmark from the same commit.
+# Building it on a fresh VM does not work: the branch's base needs unreleased versions of the auth
+# library, common protos and platform BOMs that are not on Maven Central.
+#
+# Usage (on the VM; needs a boot disk of 20 GB or more and the cloud-platform access scope):
 #   curl -sSLO https://raw.githubusercontent.com/Dhriti07/google-cloud-java/ffi-java/java-storage/rust-poc-benchmark/scripts/setup_vm.sh
-#   bash setup_vm.sh            # clones into ~/google-cloud-java
+#   JAR_URL=gs://<bucket>/<path>/rust-poc-benchmark.jar bash setup_vm.sh
 set -euo pipefail
 
 REPO=${REPO:-https://github.com/Dhriti07/google-cloud-java.git}
 BRANCH=${BRANCH:-ffi-java}
 DIR=${DIR:-$HOME/google-cloud-java}
+JAR_URL=${JAR_URL:?set JAR_URL to the gs:// path of the prebuilt rust-poc-benchmark.jar}
 
 sudo apt-get update -q
-sudo apt-get install -y -q openjdk-21-jdk-headless maven git build-essential pkg-config \
+sudo apt-get install -y -q openjdk-21-jdk-headless git build-essential pkg-config \
   protobuf-compiler curl python3 ethtool
 if ! command -v cargo >/dev/null; then
   curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
@@ -41,12 +47,10 @@ fi
 cd "$DIR"
 git log --oneline -1
 
-SKIP="-DskipTests -Dclirr.skip -Denforcer.skip -Danimal.sniffer.skip -Djacoco.skip -Dcheckstyle.skip"
-# The branch is based on an upstream commit that needs unreleased platform BOMs.
-mvn -q -B install -f sdk-platform-java/pom.xml -P quick-build -T 1C $SKIP
-mvn -q -B install -pl java-storage/google-cloud-storage -am -T 1C $SKIP
 (cd java-storage/google-cloud-storage/rust-ffi && cargo build --release)
-(cd java-storage/rust-poc-benchmark && mvn -q -B package $SKIP)
+mkdir -p java-storage/rust-poc-benchmark/target
+gcloud storage cp "$JAR_URL" java-storage/rust-poc-benchmark/target/rust-poc-benchmark.jar
+sha256sum java-storage/rust-poc-benchmark/target/rust-poc-benchmark.jar
 
 echo "== environment"
 nproc

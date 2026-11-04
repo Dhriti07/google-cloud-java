@@ -52,6 +52,13 @@ JAVA=${JAVA:-/usr/lib/jvm/java-21-openjdk-amd64/bin/java}
 # Identical for every run.
 JVM_FLAGS="-Xms$HEAP -Xmx$HEAP -XX:MaxDirectMemorySize=$HEAP -XX:+UseG1GC"
 
+for f in "$JAR" "$LIB"; do
+  if [ ! -f "$f" ]; then
+    echo "missing $f: run setup_vm.sh first" >&2
+    exit 1
+  fi
+done
+
 mkdir -p "$OUT"
 exec > >(tee -a "$OUT/run_all.log") 2>&1
 echo "results: $OUT"
