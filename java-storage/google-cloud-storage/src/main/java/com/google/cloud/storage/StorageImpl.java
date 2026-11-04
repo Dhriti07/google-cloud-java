@@ -782,6 +782,15 @@ final class StorageImpl extends BaseService<StorageOptions> implements Storage, 
     final Map<StorageRpc.Option, ?> optionsMap = opts.getRpcOptions();
     BlobInfo.Builder builder = blobInfo.toBuilder().setMd5(null).setCrc32c(null);
     BlobInfo updated = opts.blobInfoMapper().apply(builder).build();
+    if (rust != null) {
+      com.google.storage.v2.WriteObjectRequest.Builder b =
+          com.google.storage.v2.WriteObjectRequest.newBuilder()
+              .setWriteObjectSpec(
+                  com.google.storage.v2.WriteObjectSpec.newBuilder()
+                      .setResource(Conversions.grpc().blobInfo().encode(updated)));
+      return new RustWriteChannel(
+          rust, opts.writeObjectRequest().apply(b).build().getWriteObjectSpec());
+    }
 
     StorageObject encode = codecs.blobInfo().encode(updated);
     // open the resumable session outside the write channel

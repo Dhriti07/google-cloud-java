@@ -22,6 +22,7 @@ mod client;
 mod error;
 mod jni_client;
 mod json_read;
+mod json_write;
 mod lists;
 mod proto;
 mod read_session;

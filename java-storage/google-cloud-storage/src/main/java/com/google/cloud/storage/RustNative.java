@@ -135,4 +135,23 @@ final class RustNative {
 
   /** Frees a reader. Must be called exactly once per reader. */
   static native void jsonReaderFree(long reader);
+
+  /**
+   * Starts a JSON resumable upload for {@code google.storage.v2.WriteObjectSpec} bytes, using
+   * {@code chunkSize} as the upload buffer size. Returns the writer handle.
+   */
+  static native long jsonWriterOpen(long client, byte[] writeObjectSpec, int chunkSize);
+
+  /** Queues {@code src[off, off+len)}, copied once into Rust. Blocks while the queue is full. */
+  static native void jsonWriterWriteArray(long client, long writer, byte[] src, int off, int len);
+
+  /** Same as {@link #jsonWriterWriteArray}, from a direct buffer. */
+  static native void jsonWriterWriteDirect(
+      long client, long writer, ByteBuffer src, int off, int len);
+
+  /** Ends the upload. Returns the object as {@code google.storage.v2.Object} bytes. */
+  static native byte[] jsonWriterClose(long client, long writer);
+
+  /** Frees a writer. Must be called exactly once per writer. */
+  static native void jsonWriterFree(long writer);
 }
