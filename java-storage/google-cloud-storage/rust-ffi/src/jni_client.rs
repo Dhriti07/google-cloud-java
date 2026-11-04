@@ -20,7 +20,7 @@ use crate::client::Client;
 use crate::error::{FfiError, FfiResult, guarded};
 use jni::JNIEnv;
 use jni::objects::{JClass, JString, JThrowable, JValue};
-use jni::sys::jlong;
+use jni::sys::{jint, jlong};
 
 const NATIVE_EXCEPTION: &str = "com/google/cloud/storage/RustNativeException";
 
@@ -89,6 +89,7 @@ pub extern "system" fn Java_com_google_cloud_storage_RustNative_clientNew<'local
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     endpoint: JString<'local>,
+    grpc_subchannels: jint,
 ) -> jlong {
     run(&mut env, "clientNew", 0, |env| {
         let endpoint = if endpoint.is_null() {
@@ -96,7 +97,8 @@ pub extern "system" fn Java_com_google_cloud_storage_RustNative_clientNew<'local
         } else {
             Some(java_string(env, &endpoint)?)
         };
-        let client = Client::new(endpoint)?;
+        let subchannels = usize::try_from(grpc_subchannels).ok().filter(|n| *n > 0);
+        let client = Client::new(endpoint, subchannels)?;
         Ok(Box::into_raw(Box::new(client)) as jlong)
     })
 }

@@ -29,6 +29,9 @@ final class RustNative {
 
   static final String LIBRARY_PROPERTY = "gcs.rust.lib";
 
+  /** Optional: number of gRPC connections for the data path. Unset = Rust SDK default. */
+  static final String SUBCHANNELS_PROPERTY = "gcs.rust.grpc.subchannels";
+
   private static boolean loaded;
 
   private RustNative() {}
@@ -54,8 +57,12 @@ final class RustNative {
     loaded = true;
   }
 
-  /** Returns a client handle. {@code endpoint} may be null for the default endpoint. */
-  static native long clientNew(@Nullable String endpoint);
+  /**
+   * Returns a client handle. {@code endpoint} may be null for the default endpoint. {@code
+   * grpcSubchannels} sets the data-path gRPC connection count; 0 keeps the Rust SDK default (one
+   * per CPU).
+   */
+  static native long clientNew(@Nullable String endpoint, int grpcSubchannels);
 
   /** Frees a handle from {@link #clientNew}. Must be called exactly once per handle. */
   static native void clientClose(long handle);

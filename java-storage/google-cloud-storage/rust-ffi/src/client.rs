@@ -30,7 +30,12 @@ pub(crate) struct Client {
 impl Client {
     /// `endpoint` overrides the default `https://storage.googleapis.com`. Credentials come from
     /// Application Default Credentials, the same account the Java client uses by default.
-    pub(crate) fn new(endpoint: Option<String>) -> FfiResult<Self> {
+    /// `grpc_subchannels` sets the data-path connection count; `None` keeps the SDK default
+    /// (one per CPU). `control` always keeps its SDK default.
+    pub(crate) fn new(
+        endpoint: Option<String>,
+        grpc_subchannels: Option<usize>,
+    ) -> FfiResult<Self> {
         let rt = Builder::new_multi_thread()
             .enable_all()
             .thread_name("gcs-rust")
@@ -42,6 +47,9 @@ impl Client {
             if let Some(endpoint) = endpoint {
                 storage = storage.with_endpoint(endpoint.clone());
                 control = control.with_endpoint(endpoint);
+            }
+            if let Some(n) = grpc_subchannels {
+                storage = storage.with_grpc_subchannel_count(n);
             }
             let storage = storage
                 .build()

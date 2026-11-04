@@ -50,7 +50,8 @@ final class RustClient implements AutoCloseable {
   static RustClient create(@Nullable String endpoint) {
     RustNative.ensureLoaded();
     try {
-      return new RustClient(RustNative.clientNew(endpoint));
+      int subchannels = Integer.getInteger(RustNative.SUBCHANNELS_PROPERTY, 0);
+      return new RustClient(RustNative.clientNew(endpoint, subchannels));
     } catch (RustNativeException e) {
       throw RustErrors.toStorageException(e);
     }
