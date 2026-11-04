@@ -41,7 +41,7 @@ READ_BUCKET=${READ_BUCKET:-dhriti-read-west1}
 WRITE_BUCKET=${WRITE_BUCKET:-dhriti-zonal-read-west1}
 LIST_BUCKET=${LIST_BUCKET:-dhriti-read-west1}
 PROJECT=${PROJECT:-gcs-hyd-connector-benchmarks}
-HEAP=${HEAP:-16g}
+HEAP=${HEAP:-}
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../../.." && pwd)
@@ -49,8 +49,13 @@ JAR=$ROOT/java-storage/rust-poc-benchmark/target/rust-poc-benchmark.jar
 LIB=$ROOT/java-storage/google-cloud-storage/rust-ffi/target/release/libgcs_rust_ffi.so
 OUT=${OUT:-$HOME/rust-poc-results/$(date -u +%Y%m%dT%H%M%SZ)}
 JAVA=${JAVA:-/usr/lib/jvm/java-21-openjdk-amd64/bin/java}
-# Identical for every run.
-JVM_FLAGS="-Xms$HEAP -Xmx$HEAP -XX:MaxDirectMemorySize=$HEAP -XX:+UseG1GC"
+# Identical for every run. By default no heap flags: the JVM sizes the heap itself, as it would for
+# a user who doesn't tune it. Set HEAP (e.g. HEAP=16g) to use a fixed heap instead.
+if [ -n "$HEAP" ]; then
+  JVM_FLAGS="-Xms$HEAP -Xmx$HEAP -XX:MaxDirectMemorySize=$HEAP"
+else
+  JVM_FLAGS=""
+fi
 
 for f in "$JAR" "$LIB"; do
   if [ ! -f "$f" ]; then
