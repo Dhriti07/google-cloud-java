@@ -20,3 +20,4 @@
 mod client;
 mod error;
 mod jni_client;
+mod proto;
