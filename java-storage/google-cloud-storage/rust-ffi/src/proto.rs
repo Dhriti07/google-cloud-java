@@ -91,6 +91,185 @@ pub(crate) fn encode_list_objects_response(r: &model::ListObjectsResponse) -> Ve
     .encode_to_vec()
 }
 
+/// Decodes a `google.storage.v2.ListBucketsRequest` from Java into the SDK's request type.
+pub(crate) fn list_buckets_request(
+    bytes: &[u8],
+) -> Result<model::ListBucketsRequest, prost::DecodeError> {
+    let r = pb::ListBucketsRequest::decode(bytes)?;
+    let mut m = model::ListBucketsRequest::new()
+        .set_parent(r.parent)
+        .set_page_size(r.page_size)
+        .set_page_token(r.page_token)
+        .set_prefix(r.prefix)
+        .set_return_partial_success(r.return_partial_success);
+    if let Some(mask) = r.read_mask {
+        m = m.set_read_mask(google_cloud_wkt::FieldMask::default().set_paths(mask.paths));
+    }
+    Ok(m)
+}
+
+/// Encodes an SDK list response as `google.storage.v2.ListBucketsResponse` bytes for Java.
+pub(crate) fn encode_list_buckets_response(r: &model::ListBucketsResponse) -> Vec<u8> {
+    pb::ListBucketsResponse {
+        buckets: r.buckets.iter().map(bucket).collect(),
+        next_page_token: r.next_page_token.clone(),
+        unreachable: r.unreachable.clone(),
+    }
+    .encode_to_vec()
+}
+
+/// Field-by-field copy of an SDK bucket into the protobuf type.
+///
+/// Not copied: `acl` and `default_object_acl` (as for objects), `ip_filter` and the encryption
+/// enforcement configs (not used by the PoC workloads).
+fn bucket(b: &model::Bucket) -> pb::Bucket {
+    use model::bucket as mb;
+    use pb::bucket as pbb;
+    pb::Bucket {
+        name: b.name.clone(),
+        bucket_id: b.bucket_id.clone(),
+        etag: b.etag.clone(),
+        project: b.project.clone(),
+        metageneration: b.metageneration,
+        location: b.location.clone(),
+        location_type: b.location_type.clone(),
+        storage_class: b.storage_class.clone(),
+        rpo: b.rpo.clone(),
+        lifecycle: b
+            .lifecycle
+            .as_ref()
+            .map(|l: &mb::Lifecycle| pbb::Lifecycle {
+                rule: l.rule.iter().map(lifecycle_rule).collect(),
+            }),
+        create_time: b.create_time.as_ref().map(timestamp),
+        cors: b
+            .cors
+            .iter()
+            .map(|c| pbb::Cors {
+                origin: c.origin.clone(),
+                method: c.method.clone(),
+                response_header: c.response_header.clone(),
+                max_age_seconds: c.max_age_seconds,
+            })
+            .collect(),
+        update_time: b.update_time.as_ref().map(timestamp),
+        default_event_based_hold: b.default_event_based_hold,
+        labels: b.labels.clone(),
+        website: b.website.as_ref().map(|w| pbb::Website {
+            main_page_suffix: w.main_page_suffix.clone(),
+            not_found_page: w.not_found_page.clone(),
+        }),
+        versioning: b
+            .versioning
+            .as_ref()
+            .map(|v| pbb::Versioning { enabled: v.enabled }),
+        logging: b.logging.as_ref().map(|l| pbb::Logging {
+            log_bucket: l.log_bucket.clone(),
+            log_object_prefix: l.log_object_prefix.clone(),
+        }),
+        owner: b.owner.as_ref().map(|w| pb::Owner {
+            entity: w.entity.clone(),
+            entity_id: w.entity_id.clone(),
+        }),
+        encryption: b.encryption.as_ref().map(|e| pbb::Encryption {
+            default_kms_key: e.default_kms_key.clone(),
+            ..Default::default()
+        }),
+        billing: b.billing.as_ref().map(|x| pbb::Billing {
+            requester_pays: x.requester_pays,
+        }),
+        retention_policy: b.retention_policy.as_ref().map(|r| pbb::RetentionPolicy {
+            effective_time: r.effective_time.as_ref().map(timestamp),
+            is_locked: r.is_locked,
+            retention_duration: r.retention_duration.as_ref().map(duration),
+        }),
+        iam_config: b.iam_config.as_ref().map(|i| pbb::IamConfig {
+            uniform_bucket_level_access: i.uniform_bucket_level_access.as_ref().map(|u| {
+                pbb::iam_config::UniformBucketLevelAccess {
+                    enabled: u.enabled,
+                    lock_time: u.lock_time.as_ref().map(timestamp),
+                }
+            }),
+            public_access_prevention: i.public_access_prevention.clone(),
+        }),
+        satisfies_pzs: b.satisfies_pzs,
+        custom_placement_config: b.custom_placement_config.as_ref().map(|c| {
+            pbb::CustomPlacementConfig {
+                data_locations: c.data_locations.clone(),
+            }
+        }),
+        autoclass: b.autoclass.as_ref().map(|a| pbb::Autoclass {
+            enabled: a.enabled,
+            toggle_time: a.toggle_time.as_ref().map(timestamp),
+            terminal_storage_class: a.terminal_storage_class.clone(),
+            terminal_storage_class_update_time: a
+                .terminal_storage_class_update_time
+                .as_ref()
+                .map(timestamp),
+        }),
+        hierarchical_namespace: b
+            .hierarchical_namespace
+            .as_ref()
+            .map(|h| pbb::HierarchicalNamespace { enabled: h.enabled }),
+        soft_delete_policy: b
+            .soft_delete_policy
+            .as_ref()
+            .map(|d| pbb::SoftDeletePolicy {
+                retention_duration: d.retention_duration.as_ref().map(duration),
+                effective_time: d.effective_time.as_ref().map(timestamp),
+            }),
+        object_retention: b
+            .object_retention
+            .as_ref()
+            .map(|o| pbb::ObjectRetention { enabled: o.enabled }),
+        ..Default::default()
+    }
+}
+
+fn lifecycle_rule(r: &model::bucket::lifecycle::Rule) -> pb::bucket::lifecycle::Rule {
+    use pb::bucket::lifecycle::rule as pr;
+    pb::bucket::lifecycle::Rule {
+        action: r.action.as_ref().map(|a| pr::Action {
+            r#type: a.r#type.clone(),
+            storage_class: a.storage_class.clone(),
+        }),
+        condition: r.condition.as_ref().map(|c| pr::Condition {
+            age_days: c.age_days,
+            created_before: c.created_before.as_ref().map(|d| google::r#type::Date {
+                year: d.year,
+                month: d.month,
+                day: d.day,
+            }),
+            is_live: c.is_live,
+            num_newer_versions: c.num_newer_versions,
+            matches_storage_class: c.matches_storage_class.clone(),
+            days_since_custom_time: c.days_since_custom_time,
+            custom_time_before: c.custom_time_before.as_ref().map(|d| google::r#type::Date {
+                year: d.year,
+                month: d.month,
+                day: d.day,
+            }),
+            days_since_noncurrent_time: c.days_since_noncurrent_time,
+            noncurrent_time_before: c.noncurrent_time_before.as_ref().map(|d| {
+                google::r#type::Date {
+                    year: d.year,
+                    month: d.month,
+                    day: d.day,
+                }
+            }),
+            matches_prefix: c.matches_prefix.clone(),
+            matches_suffix: c.matches_suffix.clone(),
+        }),
+    }
+}
+
+fn duration(d: &google_cloud_wkt::Duration) -> prost_types::Duration {
+    prost_types::Duration {
+        seconds: d.seconds(),
+        nanos: d.nanos(),
+    }
+}
+
 /// Field-by-field copy of the SDK model into the protobuf type.
 ///
 /// Not copied: `acl` (the gRPC API doesn't return it unless asked through the read mask),
@@ -282,6 +461,95 @@ mod tests {
         assert_eq!(p.objects[1].name, "b");
         assert_eq!(p.prefixes, vec!["dir/"]);
         assert_eq!(p.next_page_token, "next");
+    }
+
+    #[test]
+    fn list_buckets_request_round_trips_every_field() {
+        let java = pb::ListBucketsRequest {
+            parent: "projects/p".into(),
+            page_size: 50,
+            page_token: "tok".into(),
+            prefix: "b-".into(),
+            read_mask: Some(prost_types::FieldMask {
+                paths: vec!["name".into()],
+            }),
+            return_partial_success: true,
+        };
+        let m = list_buckets_request(&java.encode_to_vec()).unwrap();
+
+        assert_eq!(m.parent, "projects/p");
+        assert_eq!(m.page_size, 50);
+        assert_eq!(m.page_token, "tok");
+        assert_eq!(m.prefix, "b-");
+        assert_eq!(m.read_mask.unwrap().paths, vec!["name"]);
+        assert!(m.return_partial_success);
+    }
+
+    #[test]
+    fn bucket_round_trips_through_protobuf() {
+        use model::bucket as mb;
+        let b = model::Bucket::new()
+            .set_name("projects/_/buckets/b")
+            .set_bucket_id("b")
+            .set_project("projects/123")
+            .set_metageneration(4)
+            .set_location("US-CENTRAL1")
+            .set_location_type("region")
+            .set_storage_class("STANDARD")
+            .set_rpo("DEFAULT")
+            .set_create_time(Timestamp::clamp(1_793_700_000, 1))
+            .set_labels([("team", "gcs")])
+            .set_versioning(mb::Versioning::new().set_enabled(true))
+            .set_iam_config(
+                mb::IamConfig::new()
+                    .set_public_access_prevention("enforced")
+                    .set_uniform_bucket_level_access(
+                        mb::iam_config::UniformBucketLevelAccess::new().set_enabled(true),
+                    ),
+            )
+            .set_soft_delete_policy(
+                mb::SoftDeletePolicy::new()
+                    .set_retention_duration(google_cloud_wkt::Duration::clamp(604_800, 0)),
+            )
+            .set_hierarchical_namespace(mb::HierarchicalNamespace::new().set_enabled(true))
+            .set_lifecycle(
+                mb::Lifecycle::new().set_rule([mb::lifecycle::Rule::new()
+                    .set_action(mb::lifecycle::rule::Action::new().set_type("Delete"))
+                    .set_condition(mb::lifecycle::rule::Condition::new().set_age_days(30))]),
+            )
+            .set_cors([mb::Cors::new().set_origin(["*"]).set_max_age_seconds(60)]);
+        let resp = model::ListBucketsResponse::new()
+            .set_buckets([b])
+            .set_next_page_token("next")
+            .set_unreachable(["projects/_/buckets/u"]);
+
+        let p = pb::ListBucketsResponse::decode(encode_list_buckets_response(&resp).as_slice())
+            .unwrap();
+        assert_eq!(p.next_page_token, "next");
+        assert_eq!(p.unreachable, vec!["projects/_/buckets/u"]);
+        let b = &p.buckets[0];
+        assert_eq!(b.name, "projects/_/buckets/b");
+        assert_eq!(b.bucket_id, "b");
+        assert_eq!(b.project, "projects/123");
+        assert_eq!(b.metageneration, 4);
+        assert_eq!(b.location, "US-CENTRAL1");
+        assert_eq!(b.location_type, "region");
+        assert_eq!(b.storage_class, "STANDARD");
+        assert_eq!(b.rpo, "DEFAULT");
+        assert_eq!(b.create_time.unwrap().nanos, 1);
+        assert_eq!(b.labels.get("team").map(String::as_str), Some("gcs"));
+        assert!(b.versioning.unwrap().enabled);
+        let iam = b.iam_config.clone().unwrap();
+        assert_eq!(iam.public_access_prevention, "enforced");
+        assert!(iam.uniform_bucket_level_access.unwrap().enabled);
+        let sd = b.soft_delete_policy.unwrap();
+        assert_eq!(sd.retention_duration.unwrap().seconds, 604_800);
+        assert!(b.hierarchical_namespace.unwrap().enabled);
+        let rule = &b.lifecycle.as_ref().unwrap().rule[0];
+        assert_eq!(rule.action.as_ref().unwrap().r#type, "Delete");
+        assert_eq!(rule.condition.as_ref().unwrap().age_days, Some(30));
+        assert_eq!(b.cors[0].origin, vec!["*"]);
+        assert_eq!(b.cors[0].max_age_seconds, 60);
     }
 
     #[test]

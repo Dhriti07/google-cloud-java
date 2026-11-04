@@ -471,6 +471,12 @@ final class GrpcStorageImpl extends BaseService<StorageOptions>
             .apply(ListBucketsRequest.newBuilder())
             .build();
 
+    if (rust != null) {
+      // This page class fetches next pages through listBuckets(...) below, which goes to Rust.
+      return new ListBucketsWithPartialSuccessPage(
+          grpcCallContext, request, RustLists.listBuckets(rust, request), opts);
+    }
+
     if (!request.getReturnPartialSuccess()) {
       try {
         GrpcCallContext merge = Utils.merge(grpcCallContext, Retrying.newCallContext());
@@ -1973,6 +1979,9 @@ final class GrpcStorageImpl extends BaseService<StorageOptions>
 
   private com.google.storage.v2.ListBucketsResponse listBuckets(
       GrpcCallContext grpcCallContext, ListBucketsRequest request) {
+    if (rust != null) {
+      return RustLists.listBuckets(rust, request);
+    }
     GrpcCallContext merge = Utils.merge(grpcCallContext, Retrying.newCallContext());
     return retrier.run(
         retryAlgorithmManager.getFor(request),

@@ -17,6 +17,8 @@
 package com.google.cloud.storage;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.storage.v2.ListBucketsRequest;
+import com.google.storage.v2.ListBucketsResponse;
 import com.google.storage.v2.ListObjectsRequest;
 import com.google.storage.v2.ListObjectsResponse;
 import java.util.concurrent.atomic.AtomicLong;
@@ -42,6 +44,19 @@ final class RustLists {
       throw RustErrors.toStorageException(e);
     } catch (InvalidProtocolBufferException e) {
       throw new StorageException(0, "invalid ListObjectsResponse from Rust", e);
+    }
+  }
+
+  /** Fetches one page of buckets. Blocks the calling thread, like the Java {@code list} call. */
+  static ListBucketsResponse listBuckets(RustClient client, ListBucketsRequest req) {
+    try {
+      byte[] resp = RustNative.listBuckets(client.handle(), req.toByteArray());
+      PAGES_FETCHED.incrementAndGet();
+      return ListBucketsResponse.parseFrom(resp);
+    } catch (RustNativeException e) {
+      throw RustErrors.toStorageException(e);
+    } catch (InvalidProtocolBufferException e) {
+      throw new StorageException(0, "invalid ListBucketsResponse from Rust", e);
     }
   }
 }

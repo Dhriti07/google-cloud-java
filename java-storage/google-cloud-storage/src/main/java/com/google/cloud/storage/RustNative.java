@@ -112,4 +112,10 @@ final class RustNative {
    * returns {@code google.storage.v2.ListObjectsResponse} bytes. Blocks until the page arrives.
    */
   static native byte[] listObjects(long client, byte[] listObjectsRequest);
+
+  /**
+   * Fetches one page of List Buckets. Takes {@code google.storage.v2.ListBucketsRequest} bytes and
+   * returns {@code google.storage.v2.ListBucketsResponse} bytes. Blocks until the page arrives.
+   */
+  static native byte[] listBuckets(long client, byte[] listBucketsRequest);
 }
