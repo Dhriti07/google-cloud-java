@@ -1,0 +1,59 @@
+{
+  "op": "LIST_BUCKETS",
+  "engine": "java",
+  "transport": "bidi",
+  "label": "java-default",
+  "bucket": "",
+  "threads": 1,
+  "clients": 1,
+  "rust_grpc_subchannels": "sdk-default",
+  "jvm_args": "[]",
+  "params": {
+    "project": "gcs-hyd-connector-benchmarks",
+    "page_size": 100,
+    "network": {
+      "tcp_established_443_start": 1,
+      "tcp_established_443_mid": 1,
+      "tcp_established_443_end": 1,
+      "nic_rx_Gbps": 0.0,
+      "nic_tx_Gbps": 0.001
+    }
+  },
+  "window_start": "2026-11-05T03:45:38.199311682Z",
+  "window_end": "2026-11-05T03:48:38.213485250Z",
+  "measured_seconds": 180.014,
+  "ops": 186,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 974.176,
+  "latency_ms_p90": 1055.189,
+  "latency_ms_p99": 2162.159,
+  "latency_ms_p999": 2282.025,
+  "latency_ms_max": 2282.025,
+  "latency_ms_mean": 967.637,
+  "ops_per_sec": 1.033,
+  "items_per_sec": 103.325,
+  "process_cpu_percent_of_all_cores": 0.009,
+  "process_peak_rss_mib": 408.77,
+  "available_processors": 192,
+  "java_version": "21.0.12.1",
+  "gce_instance_id": "2600115956403812512",
+  "gce_instance_name": "dhriti-read-vm-central1-u2404",
+  "gce_zone": "us-central1-f",
+  "gce_machine_type": "c4-standard-192",
+  "gce_project": "gcs-hyd-connector-benchmarks",
+  "cloud_monitoring": {
+    "window_start": "2026-11-05T03:45:38Z",
+    "window_end": "2026-11-05T03:48:38Z",
+    "cpu_utilization_percent": {
+      "samples": 3,
+      "mean": 0.13,
+      "peak": 0.19
+    },
+    "memory_percent_used": {
+      "samples": 3,
+      "mean": 0.82,
+      "peak": 0.82
+    }
+  }
+}

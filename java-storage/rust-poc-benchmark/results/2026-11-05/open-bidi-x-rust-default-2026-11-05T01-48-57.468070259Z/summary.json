@@ -1,0 +1,59 @@
+{
+  "op": "OPEN",
+  "engine": "rust",
+  "transport": "bidi",
+  "label": "rust-default",
+  "bucket": "dhriti-read-west1",
+  "threads": 1,
+  "clients": 1,
+  "rust_grpc_subchannels": "sdk-default",
+  "jvm_args": "[-Dgcs.rust.lib=/home/dhritichopra_google_com/google-cloud-java/java-storage/google-cloud-storage/rust-ffi/target/release/libgcs_rust_ffi.so]",
+  "params": {
+    "object": "rust-poc-read-104857600",
+    "engine_class": "RustBlobReadSession",
+    "network": {
+      "tcp_established_443_start": 193,
+      "tcp_established_443_mid": 193,
+      "tcp_established_443_end": 193,
+      "nic_rx_Gbps": 0.0,
+      "nic_tx_Gbps": 0.001
+    }
+  },
+  "window_start": "2026-11-05T01:49:08.877948845Z",
+  "window_end": "2026-11-05T01:52:08.899236736Z",
+  "measured_seconds": 180.021,
+  "ops": 2697,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 55.933,
+  "latency_ms_p90": 73.958,
+  "latency_ms_p99": 206.743,
+  "latency_ms_p999": 245.959,
+  "latency_ms_max": 249.492,
+  "latency_ms_mean": 66.766,
+  "ops_per_sec": 14.982,
+  "items_per_sec": 14.982,
+  "process_cpu_percent_of_all_cores": 0.007,
+  "process_peak_rss_mib": 349.301,
+  "available_processors": 192,
+  "java_version": "21.0.12.1",
+  "gce_instance_id": "2600115956403812512",
+  "gce_instance_name": "dhriti-read-vm-central1-u2404",
+  "gce_zone": "us-central1-f",
+  "gce_machine_type": "c4-standard-192",
+  "gce_project": "gcs-hyd-connector-benchmarks",
+  "cloud_monitoring": {
+    "window_start": "2026-11-05T01:49:08Z",
+    "window_end": "2026-11-05T01:52:08Z",
+    "cpu_utilization_percent": {
+      "samples": 3,
+      "mean": 0.09,
+      "peak": 0.1
+    },
+    "memory_percent_used": {
+      "samples": 3,
+      "mean": 0.8,
+      "peak": 0.8
+    }
+  }
+}
