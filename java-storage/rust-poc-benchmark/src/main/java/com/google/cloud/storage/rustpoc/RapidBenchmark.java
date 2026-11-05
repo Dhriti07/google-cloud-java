@@ -937,6 +937,7 @@ public final class RapidBenchmark {
     s.put("threads", threads);
     s.put("clients", clients);
     s.put("rust_grpc_subchannels", System.getProperty("gcs.rust.grpc.subchannels", "sdk-default"));
+    s.put("java_grpc_channels", System.getProperty("gcs.java.grpc.channels", "default"));
     s.put("jvm_args", ManagementFactory.getRuntimeMXBean().getInputArguments());
     s.put("params", params);
     s.put("window_start", windowStart.toString());

@@ -28,6 +28,7 @@ import com.google.api.core.ObsoleteApi;
 import com.google.api.gax.core.CredentialsProvider;
 import com.google.api.gax.core.FixedCredentialsProvider;
 import com.google.api.gax.core.NoCredentialsProvider;
+import com.google.api.gax.grpc.ChannelPoolSettings;
 import com.google.api.gax.grpc.GrpcCallSettings;
 import com.google.api.gax.grpc.GrpcInterceptorProvider;
 import com.google.api.gax.grpc.GrpcStubCallableFactory;
@@ -131,6 +132,9 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 @TransportCompatibility(Transport.GRPC)
 public final class GrpcStorageOptions extends StorageOptions
     implements Retrying.RetryingDependencies {
+
+  /** PoC benchmarking only: number of gRPC connections for this client. Unset = 1. */
+  static final String GRPC_CHANNELS_PROPERTY = "gcs.java.grpc.channels";
 
   private static final long serialVersionUID = -4499446543857945349L;
   private static final String GCS_SCOPE = "https://www.googleapis.com/auth/devstorage.full_control";
@@ -355,6 +359,13 @@ public final class GrpcStorageOptions extends StorageOptions
               this.getUniverseDomain(),
               !grpcClientMetricsManuallyEnabled);
       channelProviderBuilder.setChannelConfigurator(channelConfigurator);
+    }
+
+    // PoC benchmarking only: -Dgcs.java.grpc.channels=N gives this client a pool of N gRPC
+    // connections (gax spreads new calls across them). Unset keeps the default of one connection.
+    Integer channels = Integer.getInteger(GRPC_CHANNELS_PROPERTY);
+    if (channels != null && channels > 1) {
+      channelProviderBuilder.setChannelPoolSettings(ChannelPoolSettings.staticallySized(channels));
     }
 
     builder.setTransportChannelProvider(channelProviderBuilder.build());
