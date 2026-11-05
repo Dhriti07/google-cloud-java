@@ -49,10 +49,69 @@ Measured window per run:
 
 ## Results
 
+### Overview charts
+
+All charts compare Java (blue, current SDK) with Rust (orange, prototype). The data behind them
+is in [`results/2026-11-05/`](results/2026-11-05/).
+
+#### Latency
+
+Definition: the total time to complete the workload from the client application's point of view.
+Measured with a high-resolution timer around the outermost Java API call(s), reported as p50, p90
+and p99.
+
+Distribution of every measured operation (CDF; further left means faster):
+
+![Latency distribution](results/2026-11-05/charts/latency_distribution.svg)
+
+p50 / p90 / p99 per workload:
+
+![Latency percentiles](results/2026-11-05/charts/latency_percentiles.svg)
+
+#### Throughput
+
+Definition: the rate at which data is successfully transferred. Measured as total data
+transferred ÷ measured time, in MB/s and in operations per second. Rust (prototype) is run against
+Java (current SDK) on the same workload.
+
+![Throughput MB/s](results/2026-11-05/charts/throughput_mbps.svg)
+
+![Operations per second](results/2026-11-05/charts/throughput_ops.svg)
+
+Over time, for the 48-thread workloads. The write panels count completed 200 MB objects per
+second, so they look spikier than the window throughput in the tables.
+
+![Throughput over time](results/2026-11-05/charts/throughput_over_time.svg)
+
+#### CPU utilization
+
+Definition: the percentage of processing power consumed during the operations. Measured with
+`compute.googleapis.com/instance/cpu/utilization`.
+
+![CPU utilization](results/2026-11-05/charts/cpu_utilization.svg)
+
+#### Peak memory
+
+Definition: the peak memory during the run. Only the peak is measured, because Java and Rust
+allocate and reuse memory differently. Rust typically creates a new buffer every time, where
+other languages such as C++ reuse buffers, and the Rust implementation needs optimizing to reuse
+buffers. Measured with `agent.googleapis.com/memory/percent_used`.
+
+![Peak memory](results/2026-11-05/charts/memory_peak.svg)
+
+#### CPU and memory across the whole run
+
+Each shaded band is the measured window of one run: blue for Java, orange for Rust, and the
+number on top is the workload.
+
+![CPU and memory timeline](results/2026-11-05/charts/cpu_memory_timeline.svg)
+
+### Detailed tables
+
 "Rust vs Java" compares Rust with Java: lower is better for latency, CPU and memory; higher is
 better for throughput.
 
-### 1. Open: start a Bidi Read and wait for the first response (metadata), then close
+#### 1. Open: start a Bidi Read and wait for the first response (metadata), then close
 
 | | p50 ms | p90 ms | p99 ms | ops/s | CPU % mean (peak) | Peak mem % | TCP conns |
 |---|--:|--:|--:|--:|--:|--:|--:|
@@ -62,7 +121,7 @@ better for throughput.
 
 JSON: not applicable (JSON has no stream to open).
 
-### 2. Read50x2x4: 50 reads of 2 MiB at a 4 MiB stride from a 200 MiB object
+#### 2. Read50x2x4: 50 reads of 2 MiB at a 4 MiB stride from a 200 MiB object
 
 Latency is the time to complete all 50 reads.
 
@@ -77,7 +136,7 @@ Latency is the time to complete all 50 reads.
 | JSON, serialized | Java | 6,935 | 8,709 | 14,805 | 14.6 | 0.09 (0.09) | 0.95 | 1 |
 | JSON, serialized | Rust | 7,175 | 11,130 | 16,634 | 13.4 | 0.12 (0.13) | 0.80 | 1 |
 
-### 3. Random8K: random 8 KiB reads from a 100 MiB object, one at a time
+#### 3. Random8K: random 8 KiB reads from a 100 MiB object, one at a time
 
 | Transport | Engine | p50 ms | p90 ms | p99 ms | reads/s | CPU % mean (peak) | Peak mem % | TCP |
 |---|---|--:|--:|--:|--:|--:|--:|--:|
@@ -86,7 +145,7 @@ Latency is the time to complete all 50 reads.
 | JSON (one request per read) | Java | 59.2 | 66.2 | 90.8 | 16.5 | 0.10 (0.10) | 0.93 | 1 |
 | JSON (one request per read) | Rust | 59.4 | 69.7 | 173.8 | 15.8 | 0.08 (0.09) | 0.79 | 1 |
 
-### 4. 16 MiB reads of a 200 MB object, 48 threads, 5 min
+#### 4. 16 MiB reads of a 200 MB object, 48 threads, 5 min
 
 | Transport | Engine | p50 ms | p90 ms | p99 ms | MB/s (Gbps) | CPU % mean (peak) | Peak mem % | TCP | NIC rx Gbps |
 |---|---|--:|--:|--:|--:|--:|--:|--:|--:|
@@ -95,7 +154,7 @@ Latency is the time to complete all 50 reads.
 | JSON | Java | 271 | 443 | 519 | 2,688.5 (21.51) | 3.49 (3.95) | 1.99 | 48 | 22.78 |
 | JSON | Rust | 266 | 438 | 520 | 2,731.1 (21.85) | 5.26 (6.32) | 0.95 | 49 | 23.14 |
 
-### 5. 200 MB writes, 48 threads, 5 min
+#### 5. 200 MB writes, 48 threads, 5 min
 
 | Transport | Engine | p50 ms | p90 ms | p99 ms | MB/s (Gbps) | objects/s | CPU % mean (peak) | Peak mem % | TCP | NIC tx Gbps |
 |---|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
@@ -104,7 +163,7 @@ Latency is the time to complete all 50 reads.
 | JSON (regional) | Java | 5,810 | 6,842 | 7,474 | 1,588.2 (12.71) | 7.88 | 1.18 (1.29) | 1.19 | 48 | 12.77 |
 | JSON (regional) | Rust | 5,710 | 6,426 | 7,123 | 1,646.2 (13.17) | 8.22 | 1.14 (1.29) | 1.07 | 48 | 13.21 |
 
-### 6. List Objects and List Buckets, 100 items per page
+#### 6. List Objects and List Buckets, 100 items per page
 
 | Operation | Engine | p50 ms | p90 ms | p99 ms | items/s | CPU % mean (peak) | Peak mem % | TCP |
 |---|---|--:|--:|--:|--:|--:|--:|--:|
@@ -114,6 +173,21 @@ Latency is the time to complete all 50 reads.
 | List Buckets (gRPC) | Rust | 965 | 995 | 1,025 | 109 | 0.08 (0.09) | 0.80 | 1 |
 
 List over JSON is not part of the PoC.
+
+## How data moves between Java and Rust
+
+Protobuf is used only for metadata (object info and list results). Object bytes are copied
+directly, once in each direction, through JNI:
+
+| Path | Copy | Who allocates |
+|---|---|---|
+| Bidi Read (`readAs(asFutureBytes())`) | Rust copies each received chunk into the Java `byte[]` (`SetByteArrayRegion`) | Java: the result array. The Rust SDK: a new buffer for each received chunk. |
+| Read (JSON) (`reader().read(dst)`) | Rust copies the next response bytes into the caller's buffer (`memcpy` for a direct `ByteBuffer`) | The caller; the Rust SDK for each HTTP chunk |
+| Bidi Appendable Write (`write(src)`) | Rust copies the caller's bytes into a Rust buffer (`GetDirectBufferAddress` + copy), then the SDK sends it | Rust, for each write call |
+| Write (JSON) (`write(src)`) | Same as Bidi Appendable Write; the buffer then goes to the upload task | Rust, for each write call |
+
+The Java path makes the same single copy for these APIs. The higher Rust peak memory on Bidi
+reads comes from the Rust SDK allocating a fresh buffer per received chunk, not from the JNI copy.
 
 ## What the numbers show
 
