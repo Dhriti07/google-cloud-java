@@ -181,6 +181,9 @@ final class GrpcStorageImpl extends BaseService<StorageOptions>
   private final Opts<UserProject> defaultOpts;
   @Deprecated private final Supplier<ProjectId> defaultProjectId;
 
+  // Local PoC: set only when -Dgcs.rust.lib is set; otherwise every call takes the Java path.
+  private final @Nullable RustClient rust;
+
   GrpcStorageImpl(
       GrpcStorageOptions options,
       StorageClient storageClient,
@@ -200,6 +203,7 @@ final class GrpcStorageImpl extends BaseService<StorageOptions>
     this.retryAlgorithmManager = options.getRetryAlgorithmManager();
     this.syntaxDecoders = new SyntaxDecoders();
     this.defaultProjectId = Suppliers.memoize(() -> UnifiedOpts.projectId(options.getProjectId()));
+    this.rust = RustNative.isConfigured() ? RustClient.create(null) : null;
   }
 
   @Override
@@ -209,6 +213,10 @@ final class GrpcStorageImpl extends BaseService<StorageOptions>
       s.shutdownNow();
       java.time.Duration terminationAwaitDuration = getOptions().getTerminationAwaitDuration();
       s.awaitTermination(terminationAwaitDuration.toMillis(), TimeUnit.MILLISECONDS);
+    } finally {
+      if (rust != null) {
+        rust.close();
+      }
     }
   }
 
@@ -463,6 +471,12 @@ final class GrpcStorageImpl extends BaseService<StorageOptions>
             .apply(ListBucketsRequest.newBuilder())
             .build();
 
+    if (rust != null) {
+      // This page class fetches next pages through listBuckets(...) below, which goes to Rust.
+      return new ListBucketsWithPartialSuccessPage(
+          grpcCallContext, request, RustLists.listBuckets(rust, request), opts);
+    }
+
     if (!request.getReturnPartialSuccess()) {
       try {
         GrpcCallContext merge = Utils.merge(grpcCallContext, Retrying.newCallContext());
@@ -496,6 +510,10 @@ final class GrpcStorageImpl extends BaseService<StorageOptions>
     ListObjectsRequest.Builder builder =
         ListObjectsRequest.newBuilder().setParent(bucketNameCodec.encode(bucket));
     ListObjectsRequest req = opts.listObjectsRequest().apply(builder).build();
+    if (rust != null) {
+      return new ListObjectsWithSyntheticDirectoriesPage(
+          grpcCallContext, req, RustLists.listObjects(rust, req));
+    }
     try {
       GrpcCallContext merge = Utils.merge(grpcCallContext, Retrying.newCallContext());
       return retrier.run(
@@ -1439,6 +1457,13 @@ final class GrpcStorageImpl extends BaseService<StorageOptions>
   public BlobAppendableUpload blobAppendableUpload(
       BlobInfo blobInfo, BlobAppendableUploadConfig uploadConfig, BlobWriteOption... options) {
     Opts<ObjectTargetOpt> opts = Opts.unwrap(options).resolveFrom(blobInfo);
+    if (rust != null) {
+      return RustBlobAppendableUpload.create(
+          rust,
+          blobInfo,
+          uploadConfig,
+          getBidiWriteObjectRequest(blobInfo, opts, /* appendable= */ true).getWriteObjectSpec());
+    }
     return uploadConfig.create(this, blobInfo, opts);
   }
 
@@ -1482,6 +1507,10 @@ final class GrpcStorageImpl extends BaseService<StorageOptions>
     b.setReadObjectSpec(spec);
     opts.bidiReadObjectRequest().apply(b);
     BidiReadObjectRequest req = b.build();
+
+    if (rust != null) {
+      return RustBlobReadSession.open(rust, req.getReadObjectSpec());
+    }
 
     GrpcCallContext context = opts.grpcMetadataMapper().apply(GrpcCallContext.createDefault());
     ApiFuture<ObjectReadSession> session = storageDataClient.readSession(req, context);
@@ -1586,6 +1615,10 @@ final class GrpcStorageImpl extends BaseService<StorageOptions>
     public Page<Blob> getNextPage() {
       ListObjectsRequest nextPageReq =
           req.toBuilder().setPageToken(resp.getNextPageToken()).build();
+      if (rust != null) {
+        return new ListObjectsWithSyntheticDirectoriesPage(
+            ctx, nextPageReq, RustLists.listObjects(rust, nextPageReq));
+      }
       try {
         GrpcCallContext merge = Utils.merge(ctx, Retrying.newCallContext());
         ListObjectsResponse nextPageResp =
@@ -1946,6 +1979,9 @@ final class GrpcStorageImpl extends BaseService<StorageOptions>
 
   private com.google.storage.v2.ListBucketsResponse listBuckets(
       GrpcCallContext grpcCallContext, ListBucketsRequest request) {
+    if (rust != null) {
+      return RustLists.listBuckets(rust, request);
+    }
     GrpcCallContext merge = Utils.merge(grpcCallContext, Retrying.newCallContext());
     return retrier.run(
         retryAlgorithmManager.getFor(request),

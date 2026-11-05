@@ -118,6 +118,9 @@ final class StorageImpl extends BaseService<StorageOptions> implements Storage, 
   final WriterFactory writerFactory;
   final Retrier retrier;
 
+  // Local PoC: set only when -Dgcs.rust.lib is set; otherwise every call takes the Java path.
+  private final @Nullable RustClient rust;
+
   StorageImpl(HttpStorageOptions options, WriterFactory writerFactory, Retrier retrier) {
     super(options);
     this.retryAlgorithmManager = options.getRetryAlgorithmManager();
@@ -132,6 +135,14 @@ final class StorageImpl extends BaseService<StorageOptions> implements Storage, 
       throw StorageException.coalesce(e);
     }
     this.retrier = retrier;
+    this.rust = RustNative.isConfigured() ? RustClient.create(null) : null;
+  }
+
+  @Override
+  public void close() throws Exception {
+    if (rust != null) {
+      rust.close();
+    }
   }
 
   @Override
@@ -725,6 +736,15 @@ final class StorageImpl extends BaseService<StorageOptions> implements Storage, 
   @Override
   public StorageReadChannel reader(BlobId blob, BlobSourceOption... options) {
     Opts<ObjectSourceOpt> opts = Opts.unwrap(options).resolveFrom(blob);
+    if (rust != null) {
+      com.google.storage.v2.Object o = Conversions.grpc().blobId().encode(blob);
+      com.google.storage.v2.ReadObjectRequest.Builder b =
+          com.google.storage.v2.ReadObjectRequest.newBuilder()
+              .setBucket(o.getBucket())
+              .setObject(o.getName())
+              .setGeneration(o.getGeneration());
+      return new RustReadChannel(rust, opts.readObjectRequest().apply(b).build());
+    }
     StorageObject storageObject = Conversions.json().blobId().encode(blob);
     ImmutableMap<StorageRpc.Option, ?> optionsMap = opts.getRpcOptions();
     return new BlobReadChannelV2(storageObject, optionsMap, BlobReadChannelContext.from(this));
@@ -762,6 +782,15 @@ final class StorageImpl extends BaseService<StorageOptions> implements Storage, 
     final Map<StorageRpc.Option, ?> optionsMap = opts.getRpcOptions();
     BlobInfo.Builder builder = blobInfo.toBuilder().setMd5(null).setCrc32c(null);
     BlobInfo updated = opts.blobInfoMapper().apply(builder).build();
+    if (rust != null) {
+      com.google.storage.v2.WriteObjectRequest.Builder b =
+          com.google.storage.v2.WriteObjectRequest.newBuilder()
+              .setWriteObjectSpec(
+                  com.google.storage.v2.WriteObjectSpec.newBuilder()
+                      .setResource(Conversions.grpc().blobInfo().encode(updated)));
+      return new RustWriteChannel(
+          rust, opts.writeObjectRequest().apply(b).build().getWriteObjectSpec());
+    }
 
     StorageObject encode = codecs.blobInfo().encode(updated);
     // open the resumable session outside the write channel

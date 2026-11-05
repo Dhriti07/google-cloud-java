@@ -1,0 +1,324 @@
+results: /home/dhritichopra_google_com/rust-poc-results/final
+== prepare
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+== 01:44:45 java-default --workload=open --transport=bidi --bucket=dhriti-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 1,
+  "ops": 1909,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 90.810,
+  "latency_ms_p99": 143.980,
+  "items_per_sec": 10.605,
+results: /home/dhritichopra_google_com/rust-poc-results/final/open-bidi-x-java-default-2026-11-05T01-44-45.624614362Z
+== 01:48:57 rust-default --workload=open --transport=bidi --bucket=dhriti-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 193,
+  "ops": 2697,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 55.933,
+  "latency_ms_p99": 206.743,
+  "items_per_sec": 14.982,
+results: /home/dhritichopra_google_com/rust-poc-results/final/open-bidi-x-rust-default-2026-11-05T01-48-57.468070259Z
+== 01:53:09 rust-default --workload=read50x2x4 --transport=bidi --mode=concurrent --bucket=dhriti-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 51,
+  "ops": 55,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 3296.733,
+  "latency_ms_p99": 3415.983,
+  "throughput_MBps": 32.036,
+results: /home/dhritichopra_google_com/rust-poc-results/final/read50x2x4-bidi-concurrent-rust-default-2026-11-05T01-53-09.450785127Z
+== 01:57:23 java-default --workload=read50x2x4 --transport=bidi --mode=concurrent --bucket=dhriti-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 1,
+  "ops": 44,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 3549.393,
+  "latency_ms_p99": 10174.853,
+  "throughput_MBps": 25.630,
+results: /home/dhritichopra_google_com/rust-poc-results/final/read50x2x4-bidi-concurrent-java-default-2026-11-05T01-57-23.457295858Z
+== 02:01:35 java-default --workload=read50x2x4 --transport=bidi --mode=serial --bucket=dhriti-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 1,
+  "ops": 41,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 4349.021,
+  "latency_ms_p99": 4557.121,
+  "throughput_MBps": 23.882,
+results: /home/dhritichopra_google_com/rust-poc-results/final/read50x2x4-bidi-serial-java-default-2026-11-05T02-01-35.937244902Z
+== 02:05:49 rust-default --workload=read50x2x4 --transport=bidi --mode=serial --bucket=dhriti-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 60,
+  "ops": 41,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 4442.233,
+  "latency_ms_p99": 4680.088,
+  "throughput_MBps": 23.882,
+results: /home/dhritichopra_google_com/rust-poc-results/final/read50x2x4-bidi-serial-rust-default-2026-11-05T02-05-50.065876634Z
+== 02:10:05 rust-default --workload=read50x2x4 --transport=json --mode=concurrent --bucket=dhriti-read-west1
+      "tcp_established_443_mid": 50,
+  "ops": 515,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 341.575,
+  "latency_ms_p99": 1111.506,
+  "throughput_MBps": 299.991,
+results: /home/dhritichopra_google_com/rust-poc-results/final/read50x2x4-json-concurrent-rust-default-2026-11-05T02-10-05.113737405Z
+== 02:14:16 java-default --workload=read50x2x4 --transport=json --mode=concurrent --bucket=dhriti-read-west1
+      "tcp_established_443_mid": 6,
+  "ops": 240,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 692.873,
+  "latency_ms_p99": 1428.701,
+  "throughput_MBps": 139.781,
+results: /home/dhritichopra_google_com/rust-poc-results/final/read50x2x4-json-concurrent-java-default-2026-11-05T02-14-16.230180195Z
+== 02:18:27 java-default --workload=read50x2x4 --transport=json --mode=serial --bucket=dhriti-read-west1
+      "tcp_established_443_mid": 1,
+  "ops": 25,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 6935.326,
+  "latency_ms_p99": 14804.678,
+  "throughput_MBps": 14.563,
+results: /home/dhritichopra_google_com/rust-poc-results/final/read50x2x4-json-serial-java-default-2026-11-05T02-18-27.619635068Z
+== 02:22:41 rust-default --workload=read50x2x4 --transport=json --mode=serial --bucket=dhriti-read-west1
+      "tcp_established_443_mid": 1,
+  "ops": 23,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 7175.450,
+  "latency_ms_p99": 16633.583,
+  "throughput_MBps": 13.398,
+results: /home/dhritichopra_google_com/rust-poc-results/final/read50x2x4-json-serial-rust-default-2026-11-05T02-22-41.497863803Z
+== 02:26:54 rust-default --workload=random8k --transport=bidi --bucket=dhriti-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 34,
+  "ops": 4662,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 37.719,
+  "latency_ms_p99": 52.057,
+  "throughput_MBps": 0.212,
+results: /home/dhritichopra_google_com/rust-poc-results/final/random8k-bidi-x-rust-default-2026-11-05T02-26-54.696237835Z
+== 02:31:06 java-default --workload=random8k --transport=bidi --bucket=dhriti-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 1,
+  "ops": 4340,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 41.432,
+  "latency_ms_p99": 47.285,
+  "throughput_MBps": 0.197,
+results: /home/dhritichopra_google_com/rust-poc-results/final/random8k-bidi-x-java-default-2026-11-05T02-31-06.895680787Z
+== 02:35:18 java-default --workload=random8k --transport=json --bucket=dhriti-read-west1
+      "tcp_established_443_mid": 1,
+  "ops": 2973,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 59.219,
+  "latency_ms_p99": 90.788,
+  "throughput_MBps": 0.135,
+results: /home/dhritichopra_google_com/rust-poc-results/final/random8k-json-x-java-default-2026-11-05T02-35-18.936706177Z
+== 02:39:29 rust-default --workload=random8k --transport=json --bucket=dhriti-read-west1
+      "tcp_established_443_mid": 1,
+  "ops": 2848,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 59.391,
+  "latency_ms_p99": 173.768,
+  "throughput_MBps": 0.130,
+results: /home/dhritichopra_google_com/rust-poc-results/final/random8k-json-x-rust-default-2026-11-05T02-39-29.711311800Z
+== 02:43:40 rust-default --workload=read --transport=bidi --bucket=dhriti-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 64,
+  "ops": 26301,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 541.817,
+  "latency_ms_p99": 682.880,
+  "throughput_MBps": 1470.711,
+results: /home/dhritichopra_google_com/rust-poc-results/final/read-bidi-x-rust-default-2026-11-05T02-43-40.546634874Z
+== 02:50:14 java-default --workload=read --transport=bidi --bucket=dhriti-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 1,
+  "ops": 5376,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 2677.880,
+  "latency_ms_p99": 3118.786,
+  "throughput_MBps": 300.631,
+results: /home/dhritichopra_google_com/rust-poc-results/final/read-bidi-x-java-default-2026-11-05T02-50-14.173424092Z
+== 02:56:47 java-default --workload=read --transport=json --bucket=dhriti-read-west1
+      "tcp_established_443_mid": 48,
+  "ops": 48076,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 270.457,
+  "latency_ms_p99": 518.774,
+  "throughput_MBps": 2688.482,
+results: /home/dhritichopra_google_com/rust-poc-results/final/read-json-x-java-default-2026-11-05T02-56-47.440743374Z
+== 03:03:19 rust-default --workload=read --transport=json --bucket=dhriti-read-west1
+      "tcp_established_443_mid": 49,
+  "ops": 48838,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 265.803,
+  "latency_ms_p99": 520.160,
+  "throughput_MBps": 2731.097,
+results: /home/dhritichopra_google_com/rust-poc-results/final/read-json-x-rust-default-2026-11-05T03-03-19.172700144Z
+== 03:09:50 rust-default --workload=write --transport=bidi --bucket=dhriti-zonal-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 192,
+  "ops": 6886,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 1829.718,
+  "latency_ms_p99": 5677.213,
+  "throughput_MBps": 4594.412,
+results: /home/dhritichopra_google_com/rust-poc-results/final/write-bidi-x-rust-default-2026-11-05T03-09-51.052952767Z
+== 03:16:53 java-default --workload=write --transport=bidi --bucket=dhriti-zonal-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 1,
+  "ops": 504,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 27257.661,
+  "latency_ms_p99": 37706.128,
+  "throughput_MBps": 343.536,
+results: /home/dhritichopra_google_com/rust-poc-results/final/write-bidi-x-java-default-2026-11-05T03-16-53.850680479Z
+== 03:23:42 java-default --workload=write --transport=json --bucket=dhriti-read-west1
+      "tcp_established_443_mid": 48,
+  "ops": 2364,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 5809.981,
+  "latency_ms_p99": 7474.181,
+  "throughput_MBps": 1588.180,
+results: /home/dhritichopra_google_com/rust-poc-results/final/write-json-x-java-default-2026-11-05T03-23-42.117555585Z
+== 03:30:21 rust-default --workload=write --transport=json --bucket=dhriti-read-west1
+      "tcp_established_443_mid": 48,
+  "ops": 2467,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 5710.073,
+  "latency_ms_p99": 7122.823,
+  "throughput_MBps": 1646.222,
+results: /home/dhritichopra_google_com/rust-poc-results/final/write-json-x-rust-default-2026-11-05T03-30-21.839120050Z
+== 03:37:04 rust-default --workload=list-objects --transport=bidi --bucket=dhriti-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 1,
+  "ops": 2944,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 59.360,
+  "latency_ms_p99": 110.802,
+  "items_per_sec": 1635.427,
+results: /home/dhritichopra_google_com/rust-poc-results/final/list-objects-bidi-x-rust-default-2026-11-05T03-37-04.687103216Z
+== 03:41:15 java-default --workload=list-objects --transport=bidi --bucket=dhriti-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 1,
+  "ops": 2862,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 60.980,
+  "latency_ms_p99": 129.006,
+  "items_per_sec": 1589.863,
+results: /home/dhritichopra_google_com/rust-poc-results/final/list-objects-bidi-x-java-default-2026-11-05T03-41-15.874464028Z
+== 03:45:27 java-default --workload=list-buckets --transport=bidi --project=gcs-hyd-connector-benchmarks
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 1,
+  "ops": 186,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 974.176,
+  "latency_ms_p99": 2162.159,
+  "items_per_sec": 103.325,
+results: /home/dhritichopra_google_com/rust-poc-results/final/list-buckets-bidi-x-java-default-2026-11-05T03-45-27.613116859Z
+== 03:49:38 rust-default --workload=list-buckets --transport=bidi --project=gcs-hyd-connector-benchmarks
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 1,
+  "ops": 196,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 965.217,
+  "latency_ms_p99": 1025.004,
+  "items_per_sec": 108.879,
+results: /home/dhritichopra_google_com/rust-poc-results/final/list-buckets-bidi-x-rust-default-2026-11-05T03-49-38.819966371Z
+== waiting 240 s for Cloud Monitoring
+/home/dhritichopra_google_com/rust-poc-results/final/list-buckets-bidi-x-java-default-2026-11-05T03-45-27.613116859Z/summary.json: {"window_start": "2026-11-05T03:45:38Z", "window_end": "2026-11-05T03:48:38Z", "cpu_utilization_percent": {"samples": 3, "mean": 0.13, "peak": 0.19}, "memory_percent_used": {"samples": 3, "mean": 0.82, "peak": 0.82}}
+/home/dhritichopra_google_com/rust-poc-results/final/list-buckets-bidi-x-rust-default-2026-11-05T03-49-38.819966371Z/summary.json: {"window_start": "2026-11-05T03:49:49Z", "window_end": "2026-11-05T03:52:49Z", "cpu_utilization_percent": {"samples": 3, "mean": 0.08, "peak": 0.09}, "memory_percent_used": {"samples": 3, "mean": 0.8, "peak": 0.8}}
+/home/dhritichopra_google_com/rust-poc-results/final/list-objects-bidi-x-java-default-2026-11-05T03-41-15.874464028Z/summary.json: {"window_start": "2026-11-05T03:41:27Z", "window_end": "2026-11-05T03:44:27Z", "cpu_utilization_percent": {"samples": 3, "mean": 0.11, "peak": 0.13}, "memory_percent_used": {"samples": 3, "mean": 0.82, "peak": 0.83}}
+/home/dhritichopra_google_com/rust-poc-results/final/list-objects-bidi-x-rust-default-2026-11-05T03-37-04.687103216Z/summary.json: {"window_start": "2026-11-05T03:37:15Z", "window_end": "2026-11-05T03:40:15Z", "cpu_utilization_percent": {"samples": 3, "mean": 0.09, "peak": 0.1}, "memory_percent_used": {"samples": 3, "mean": 0.82, "peak": 0.83}}
+/home/dhritichopra_google_com/rust-poc-results/final/open-bidi-x-java-default-2026-11-05T01-44-45.624614362Z/summary.json: {"window_start": "2026-11-05T01:44:56Z", "window_end": "2026-11-05T01:47:56Z", "cpu_utilization_percent": {"samples": 3, "mean": 0.16, "peak": 0.19}, "memory_percent_used": {"samples": 3, "mean": 0.81, "peak": 0.82}}
+/home/dhritichopra_google_com/rust-poc-results/final/open-bidi-x-rust-default-2026-11-05T01-48-57.468070259Z/summary.json: {"window_start": "2026-11-05T01:49:08Z", "window_end": "2026-11-05T01:52:08Z", "cpu_utilization_percent": {"samples": 3, "mean": 0.09, "peak": 0.1}, "memory_percent_used": {"samples": 3, "mean": 0.8, "peak": 0.8}}
+/home/dhritichopra_google_com/rust-poc-results/final/random8k-bidi-x-java-default-2026-11-05T02-31-06.895680787Z/summary.json: {"window_start": "2026-11-05T02:31:18Z", "window_end": "2026-11-05T02:34:18Z", "cpu_utilization_percent": {"samples": 3, "mean": 0.1, "peak": 0.11}, "memory_percent_used": {"samples": 3, "mean": 0.8, "peak": 0.8}}
+/home/dhritichopra_google_com/rust-poc-results/final/random8k-bidi-x-rust-default-2026-11-05T02-26-54.696237835Z/summary.json: {"window_start": "2026-11-05T02:27:06Z", "window_end": "2026-11-05T02:30:06Z", "cpu_utilization_percent": {"samples": 3, "mean": 0.09, "peak": 0.11}, "memory_percent_used": {"samples": 3, "mean": 0.79, "peak": 0.8}}
+/home/dhritichopra_google_com/rust-poc-results/final/random8k-json-x-java-default-2026-11-05T02-35-18.936706177Z/summary.json: {"window_start": "2026-11-05T02:35:29Z", "window_end": "2026-11-05T02:38:29Z", "cpu_utilization_percent": {"samples": 3, "mean": 0.1, "peak": 0.1}, "memory_percent_used": {"samples": 3, "mean": 0.9, "peak": 0.93}}
+/home/dhritichopra_google_com/rust-poc-results/final/random8k-json-x-rust-default-2026-11-05T02-39-29.711311800Z/summary.json: {"window_start": "2026-11-05T02:39:40Z", "window_end": "2026-11-05T02:42:40Z", "cpu_utilization_percent": {"samples": 3, "mean": 0.08, "peak": 0.09}, "memory_percent_used": {"samples": 3, "mean": 0.78, "peak": 0.79}}
+/home/dhritichopra_google_com/rust-poc-results/final/read-bidi-x-java-default-2026-11-05T02-50-14.173424092Z/summary.json: {"window_start": "2026-11-05T02:50:45Z", "window_end": "2026-11-05T02:55:45Z", "cpu_utilization_percent": {"samples": 5, "mean": 0.82, "peak": 0.9}, "memory_percent_used": {"samples": 5, "mean": 1.33, "peak": 1.51}}
+/home/dhritichopra_google_com/rust-poc-results/final/read-bidi-x-rust-default-2026-11-05T02-43-40.546634874Z/summary.json: {"window_start": "2026-11-05T02:44:12Z", "window_end": "2026-11-05T02:49:12Z", "cpu_utilization_percent": {"samples": 5, "mean": 3.21, "peak": 3.37}, "memory_percent_used": {"samples": 5, "mean": 3.19, "peak": 3.22}}
+/home/dhritichopra_google_com/rust-poc-results/final/read-json-x-java-default-2026-11-05T02-56-47.440743374Z/summary.json: {"window_start": "2026-11-05T02:57:18Z", "window_end": "2026-11-05T03:02:18Z", "cpu_utilization_percent": {"samples": 5, "mean": 3.49, "peak": 3.95}, "memory_percent_used": {"samples": 5, "mean": 1.65, "peak": 1.99}}
+/home/dhritichopra_google_com/rust-poc-results/final/read-json-x-rust-default-2026-11-05T03-03-19.172700144Z/summary.json: {"window_start": "2026-11-05T03:03:50Z", "window_end": "2026-11-05T03:08:50Z", "cpu_utilization_percent": {"samples": 5, "mean": 5.26, "peak": 6.32}, "memory_percent_used": {"samples": 5, "mean": 0.94, "peak": 0.95}}
+/home/dhritichopra_google_com/rust-poc-results/final/read50x2x4-bidi-concurrent-java-default-2026-11-05T01-57-23.457295858Z/summary.json: {"window_start": "2026-11-05T01:57:34Z", "window_end": "2026-11-05T02:00:34Z", "cpu_utilization_percent": {"samples": 3, "mean": 0.15, "peak": 0.16}, "memory_percent_used": {"samples": 3, "mean": 0.96, "peak": 0.97}}
+/home/dhritichopra_google_com/rust-poc-results/final/read50x2x4-bidi-concurrent-rust-default-2026-11-05T01-53-09.450785127Z/summary.json: {"window_start": "2026-11-05T01:53:21Z", "window_end": "2026-11-05T01:56:21Z", "cpu_utilization_percent": {"samples": 3, "mean": 0.12, "peak": 0.12}, "memory_percent_used": {"samples": 3, "mean": 1.05, "peak": 1.09}}
+/home/dhritichopra_google_com/rust-poc-results/final/read50x2x4-bidi-serial-java-default-2026-11-05T02-01-35.937244902Z/summary.json: {"window_start": "2026-11-05T02:01:47Z", "window_end": "2026-11-05T02:04:47Z", "cpu_utilization_percent": {"samples": 3, "mean": 0.12, "peak": 0.14}, "memory_percent_used": {"samples": 3, "mean": 0.81, "peak": 0.82}}
+/home/dhritichopra_google_com/rust-poc-results/final/read50x2x4-bidi-serial-rust-default-2026-11-05T02-05-50.065876634Z/summary.json: {"window_start": "2026-11-05T02:06:01Z", "window_end": "2026-11-05T02:09:01Z", "cpu_utilization_percent": {"samples": 3, "mean": 0.11, "peak": 0.12}, "memory_percent_used": {"samples": 3, "mean": 0.8, "peak": 0.8}}
+/home/dhritichopra_google_com/rust-poc-results/final/read50x2x4-json-concurrent-java-default-2026-11-05T02-14-16.230180195Z/summary.json: {"window_start": "2026-11-05T02:14:26Z", "window_end": "2026-11-05T02:17:26Z", "cpu_utilization_percent": {"samples": 3, "mean": 0.59, "peak": 0.67}, "memory_percent_used": {"samples": 3, "mean": 1.38, "peak": 1.42}}
+/home/dhritichopra_google_com/rust-poc-results/final/read50x2x4-json-concurrent-rust-default-2026-11-05T02-10-05.113737405Z/summary.json: {"window_start": "2026-11-05T02:10:15Z", "window_end": "2026-11-05T02:13:15Z", "cpu_utilization_percent": {"samples": 3, "mean": 0.82, "peak": 0.9}, "memory_percent_used": {"samples": 3, "mean": 0.83, "peak": 0.84}}
+/home/dhritichopra_google_com/rust-poc-results/final/read50x2x4-json-serial-java-default-2026-11-05T02-18-27.619635068Z/summary.json: {"window_start": "2026-11-05T02:18:38Z", "window_end": "2026-11-05T02:21:38Z", "cpu_utilization_percent": {"samples": 3, "mean": 0.09, "peak": 0.09}, "memory_percent_used": {"samples": 3, "mean": 0.9, "peak": 0.95}}
+/home/dhritichopra_google_com/rust-poc-results/final/read50x2x4-json-serial-rust-default-2026-11-05T02-22-41.497863803Z/summary.json: {"window_start": "2026-11-05T02:22:52Z", "window_end": "2026-11-05T02:25:52Z", "cpu_utilization_percent": {"samples": 3, "mean": 0.12, "peak": 0.13}, "memory_percent_used": {"samples": 3, "mean": 0.8, "peak": 0.8}}
+/home/dhritichopra_google_com/rust-poc-results/final/write-bidi-x-java-default-2026-11-05T03-16-53.850680479Z/summary.json: {"window_start": "2026-11-05T03:17:24Z", "window_end": "2026-11-05T03:22:24Z", "cpu_utilization_percent": {"samples": 5, "mean": 22.7, "peak": 24.0}, "memory_percent_used": {"samples": 5, "mean": 3.23, "peak": 3.71}}
+/home/dhritichopra_google_com/rust-poc-results/final/write-bidi-x-rust-default-2026-11-05T03-09-51.052952767Z/summary.json: {"window_start": "2026-11-05T03:10:21Z", "window_end": "2026-11-05T03:15:21Z", "cpu_utilization_percent": {"samples": 5, "mean": 4.11, "peak": 4.45}, "memory_percent_used": {"samples": 5, "mean": 2.41, "peak": 2.48}}
+/home/dhritichopra_google_com/rust-poc-results/final/write-json-x-java-default-2026-11-05T03-23-42.117555585Z/summary.json: {"window_start": "2026-11-05T03:24:12Z", "window_end": "2026-11-05T03:29:12Z", "cpu_utilization_percent": {"samples": 5, "mean": 1.18, "peak": 1.29}, "memory_percent_used": {"samples": 5, "mean": 1.18, "peak": 1.19}}
+/home/dhritichopra_google_com/rust-poc-results/final/write-json-x-rust-default-2026-11-05T03-30-21.839120050Z/summary.json: {"window_start": "2026-11-05T03:30:52Z", "window_end": "2026-11-05T03:35:52Z", "cpu_utilization_percent": {"samples": 5, "mean": 1.14, "peak": 1.29}, "memory_percent_used": {"samples": 5, "mean": 1.05, "peak": 1.07}}
+done: /home/dhritichopra_google_com/rust-poc-results/final/summary.md

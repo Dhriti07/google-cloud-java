@@ -1,0 +1,65 @@
+{
+  "op": "READ50X2X4_JSON_SERIAL",
+  "engine": "java",
+  "transport": "json",
+  "label": "java-default",
+  "bucket": "dhriti-read-west1",
+  "threads": 1,
+  "clients": 1,
+  "rust_grpc_subchannels": "sdk-default",
+  "jvm_args": "[]",
+  "params": {
+    "object": "rust-poc-read-209715200",
+    "mode": "serial",
+    "ranges": 50,
+    "range_size": 2097152,
+    "stride": 4194304,
+    "engine_class": "BlobReadChannelV2",
+    "network": {
+      "tcp_established_443_start": 1,
+      "tcp_established_443_mid": 1,
+      "tcp_established_443_end": 1,
+      "nic_rx_Gbps": 0.123,
+      "nic_tx_Gbps": 0.001
+    }
+  },
+  "window_start": "2026-11-05T02:18:38.181162564Z",
+  "window_end": "2026-11-05T02:21:38.189844935Z",
+  "measured_seconds": 180.009,
+  "ops": 25,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 6935.326,
+  "latency_ms_p90": 8708.673,
+  "latency_ms_p99": 14804.678,
+  "latency_ms_p999": 14804.678,
+  "latency_ms_max": 14804.678,
+  "latency_ms_mean": 7450.05,
+  "ops_per_sec": 0.139,
+  "bytes": 2621440000,
+  "throughput_MBps": 14.563,
+  "throughput_Gbps": 0.117,
+  "process_cpu_percent_of_all_cores": 0.017,
+  "process_peak_rss_mib": 1390.051,
+  "available_processors": 192,
+  "java_version": "21.0.12.1",
+  "gce_instance_id": "2600115956403812512",
+  "gce_instance_name": "dhriti-read-vm-central1-u2404",
+  "gce_zone": "us-central1-f",
+  "gce_machine_type": "c4-standard-192",
+  "gce_project": "gcs-hyd-connector-benchmarks",
+  "cloud_monitoring": {
+    "window_start": "2026-11-05T02:18:38Z",
+    "window_end": "2026-11-05T02:21:38Z",
+    "cpu_utilization_percent": {
+      "samples": 3,
+      "mean": 0.09,
+      "peak": 0.09
+    },
+    "memory_percent_used": {
+      "samples": 3,
+      "mean": 0.9,
+      "peak": 0.95
+    }
+  }
+}

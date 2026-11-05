@@ -1,0 +1,36 @@
+[package]
+name = "gcs-rust-ffi"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Local PoC: lets java-storage call the Rust Storage SDK through JNI.
+# Build: cargo build --release   ->   target/release/libgcs_rust_ffi.so
+# Java loads it from -Dgcs.rust.lib=<path to the .so>.
+
+[lib]
+name = "gcs_rust_ffi"
+crate-type = ["cdylib"]
+
+[dependencies]
+# The released Rust Storage SDK, used as-is.
+bytes = "1"
+futures = "0.3"
+google-cloud-storage = "1.20.0"
+google-cloud-wkt = "1.9.0"
+jni = "0.21"
+prost = "0.14"
+prost-types = "0.14"
+tokio = { version = "1.53", features = ["rt-multi-thread", "sync"] }
+# Already in the tree through the SDK; used only to read a gRPC status the SDK nests inside
+# another error (see error.rs).
+tonic = { version = "0.14", default-features = false }
+
+[build-dependencies]
+prost-build = "0.14"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(google_cloud_unstable_storage_bidi)"] }
+
+[dev-dependencies]
+google-cloud-gax = "1.15.0"
