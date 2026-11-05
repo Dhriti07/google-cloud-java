@@ -174,6 +174,52 @@ Latency is the time to complete all 50 reads.
 
 List over JSON is not part of the PoC.
 
+## Additional run: same number of connections (48 each)
+
+The tables above use each engine's default connections (Java 1, Rust up to one per CPU). This
+additional run gives **both engines 48 gRPC connections from a single client**, for the two
+48-thread Bidi workloads, so the engines can be compared without the connection difference.
+
+| | How it gets 48 connections |
+|---|---|
+| Java | One `Storage` client with `-Dgcs.java.grpc.channels=48`. This is a PoC-only, off-by-default setting that passes `ChannelPoolSettings.staticallySized(48)` to gax; java-storage doesn't expose a pool size. gax hands each new call to the next connection in turn. |
+| Rust | One client with `-Dgcs.rust.grpc.subchannels=48` |
+
+Run on 2026-11-05, 08:15–08:54 UTC, on the same VM, buckets, jar build and JVM flags as above.
+Java and Rust ran back to back for each workload, with a 60 s cooldown. Measured windows were
+5 min after a 30 s warm-up. A 45 s smoke test of both setups passed first. **0 errors in every
+run.** The TCP column confirms both engines used about 48 connections. Raw data:
+[`results/2026-11-05-matched-48conn/`](results/2026-11-05-matched-48conn/).
+
+![Matched connections](results/2026-11-05-matched-48conn/charts/matched_48conn.svg)
+
+#### 16 MiB reads of a 200 MB object, 48 threads, Bidi, 48 connections each
+
+| Engine | p50 ms | p90 ms | p99 ms | MB/s (Gbps) | CPU % mean (peak) | Peak mem % | TCP | NIC rx Gbps |
+|---|--:|--:|--:|--:|--:|--:|--:|--:|
+| Java | 546 | 581 | 639 | 1,467.2 (11.74) | 2.84 (3.34) | 1.52 | 48 | 12.44 |
+| Rust | 542 | 584 | 653 | 1,475.1 (11.80) | 3.11 (3.34) | 5.25 | 49 | 12.51 |
+
+#### 200 MB writes, 48 threads, Bidi appendable, 48 connections each
+
+| Engine | p50 ms | p90 ms | p99 ms | MB/s (Gbps) | objects/s | CPU % mean (peak) | Peak mem % | TCP | NIC tx Gbps |
+|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+| Java | 1,171 | 1,906 | 11,413 | 6,033.0 (48.26) | 30.13 | 25.37 (27.95) | 4.13 | 48 | 50.61 |
+| Rust | 1,770 | 2,968 | 7,356 | 4,741.0 (37.93) | 23.73 | 4.17 (4.69) | 2.68 | 48 | 38.16 |
+
+**What this shows**
+
+- **Reads:** with the same connections, **throughput and latency are even** (11.74 vs
+  11.80 Gbps, p50 546 vs 542 ms). CPU is about the same. Rust's **peak memory is about 3.5×**
+  Java's (5.25% vs 1.52% of the VM, about 38 vs 11 GB).
+- **Writes:** with the same connections, **Java moves about 27% more data** (48.3 vs
+  37.9 Gbps) and has a lower median latency. But Java uses **about 6× the CPU** (25.4% vs 4.2%
+  of the VM, about 49 vs 8 vCPUs), which is about 5× more CPU per Gbps. Java also has a longer
+  p99 tail (11.4 vs 7.4 s) and higher peak memory (4.13% vs 2.68%).
+- So the large Rust lead in the default-settings tables comes from the connection count. With
+  connections matched, Rust's clear advantage is **CPU on writes**, and its clear disadvantage is
+  **memory on reads**.
+
 ## How data moves between Java and Rust
 
 Protobuf is used only for metadata (object info and list results). Object bytes are copied

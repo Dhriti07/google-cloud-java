@@ -1,0 +1,99 @@
+results: /home/dhritichopra_google_com/rust-poc-results/matched-48conn
+== smoke (new configurations, 45 s each)
+== 08:15:14 java-48conn --workload=read --transport=bidi --bucket=dhriti-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 48,
+  "ops": 3826,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 557.771,
+  "throughput_MBps": 1425.742,
+results: /home/dhritichopra_google_com/rust-poc-results/matched-48conn/smoke/read-bidi-x-java-48conn-2026-11-05T08-15-15.049887205Z
+== 08:16:13 rust-48conn --workload=read --transport=bidi --bucket=dhriti-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 49,
+  "ops": 3800,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 555.813,
+  "throughput_MBps": 1415.926,
+results: /home/dhritichopra_google_com/rust-poc-results/matched-48conn/smoke/read-bidi-x-rust-48conn-2026-11-05T08-16-13.465850614Z
+== 08:17:12 java-48conn --workload=write --transport=bidi --bucket=dhriti-zonal-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 48,
+  "ops": 1139,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 1674.838,
+  "throughput_MBps": 5063.982,
+results: /home/dhritichopra_google_com/rust-poc-results/matched-48conn/smoke/write-bidi-x-java-48conn-2026-11-05T08-17-12.378186546Z
+== 08:18:23 rust-48conn --workload=write --transport=bidi --bucket=dhriti-zonal-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 48,
+  "ops": 959,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 2036.047,
+  "throughput_MBps": 4258.399,
+results: /home/dhritichopra_google_com/rust-poc-results/matched-48conn/smoke/write-bidi-x-rust-48conn-2026-11-05T08-18-23.635944208Z
+smoke runs: 4
+SMOKE-OK
+== full run
+== 08:20:28 java-48conn --workload=read --transport=bidi --bucket=dhriti-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 48,
+  "ops": 26237,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 546.161,
+  "throughput_MBps": 1467.175,
+results: /home/dhritichopra_google_com/rust-poc-results/matched-48conn/read-bidi-x-java-48conn-2026-11-05T08-20-28.333278733Z
+== 08:27:01 rust-48conn --workload=read --transport=bidi --bucket=dhriti-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 49,
+  "ops": 26379,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 542.084,
+  "throughput_MBps": 1475.117,
+results: /home/dhritichopra_google_com/rust-poc-results/matched-48conn/read-bidi-x-rust-48conn-2026-11-05T08-27-01.863767290Z
+== 08:33:35 rust-48conn --workload=write --transport=bidi --bucket=dhriti-zonal-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 48,
+  "ops": 7118,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 1769.958,
+  "throughput_MBps": 4740.971,
+results: /home/dhritichopra_google_com/rust-poc-results/matched-48conn/write-bidi-x-rust-48conn-2026-11-05T08-33-35.916756808Z
+== 08:40:17 java-48conn --workload=write --transport=bidi --bucket=dhriti-zonal-read-west1
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+      "tcp_established_443_mid": 48,
+  "ops": 9041,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 1171.225,
+  "throughput_MBps": 6033.006,
+results: /home/dhritichopra_google_com/rust-poc-results/matched-48conn/write-bidi-x-java-48conn-2026-11-05T08-40-17.240605744Z
+== waiting 240 s for Cloud Monitoring
+/home/dhritichopra_google_com/rust-poc-results/matched-48conn/read-bidi-x-java-48conn-2026-11-05T08-20-28.333278733Z/summary.json: {"window_start": "2026-11-05T08:21:00Z", "window_end": "2026-11-05T08:26:00Z", "cpu_utilization_percent": {"samples": 5, "mean": 2.84, "peak": 3.34}, "memory_percent_used": {"samples": 5, "mean": 1.49, "peak": 1.52}}
+/home/dhritichopra_google_com/rust-poc-results/matched-48conn/read-bidi-x-rust-48conn-2026-11-05T08-27-01.863767290Z/summary.json: {"window_start": "2026-11-05T08:27:33Z", "window_end": "2026-11-05T08:32:33Z", "cpu_utilization_percent": {"samples": 5, "mean": 3.11, "peak": 3.34}, "memory_percent_used": {"samples": 5, "mean": 5.23, "peak": 5.25}}
+/home/dhritichopra_google_com/rust-poc-results/matched-48conn/write-bidi-x-java-48conn-2026-11-05T08-40-17.240605744Z/summary.json: {"window_start": "2026-11-05T08:40:47Z", "window_end": "2026-11-05T08:45:47Z", "cpu_utilization_percent": {"samples": 5, "mean": 25.37, "peak": 27.95}, "memory_percent_used": {"samples": 5, "mean": 3.98, "peak": 4.13}}
+/home/dhritichopra_google_com/rust-poc-results/matched-48conn/write-bidi-x-rust-48conn-2026-11-05T08-33-35.916756808Z/summary.json: {"window_start": "2026-11-05T08:34:06Z", "window_end": "2026-11-05T08:39:06Z", "cpu_utilization_percent": {"samples": 5, "mean": 4.17, "peak": 4.69}, "memory_percent_used": {"samples": 5, "mean": 2.54, "peak": 2.68}}
+done: /home/dhritichopra_google_com/rust-poc-results/matched-48conn/summary.md

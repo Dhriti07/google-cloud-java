@@ -1,0 +1,65 @@
+{
+  "op": "BIDI_APPENDABLE_WRITE",
+  "engine": "rust",
+  "transport": "bidi",
+  "label": "rust-48conn",
+  "bucket": "dhriti-zonal-read-west1",
+  "threads": 48,
+  "clients": 1,
+  "rust_grpc_subchannels": "48",
+  "java_grpc_channels": "default",
+  "jvm_args": "[-Dgcs.rust.lib=/home/dhritichopra_google_com/google-cloud-java/java-storage/google-cloud-storage/rust-ffi/target/release/libgcs_rust_ffi.so, -Dgcs.rust.grpc.subchannels=48]",
+  "params": {
+    "object_size": 200000000,
+    "write_chunk": 2097152,
+    "prefix": "rust-poc-write-rust-48conn/",
+    "engine_class": "RustBlobAppendableUpload",
+    "network": {
+      "tcp_established_443_start": 48,
+      "tcp_established_443_mid": 48,
+      "tcp_established_443_end": 48,
+      "nic_rx_Gbps": 0.581,
+      "nic_tx_Gbps": 38.155
+    }
+  },
+  "window_start": "2026-11-05T08:34:06.673201433Z",
+  "window_end": "2026-11-05T08:39:06.694381388Z",
+  "measured_seconds": 300.021,
+  "ops": 7118,
+  "errors": 0,
+  "first_error": null,
+  "latency_ms_p50": 1769.958,
+  "latency_ms_p90": 2967.507,
+  "latency_ms_p99": 7355.92,
+  "latency_ms_p999": 14389.365,
+  "latency_ms_max": 17336.123,
+  "latency_ms_mean": 2024.624,
+  "ops_per_sec": 23.725,
+  "bytes": 1422391611392,
+  "throughput_MBps": 4740.971,
+  "throughput_Gbps": 37.928,
+  "completed_objects_Gbps": 37.96,
+  "process_cpu_percent_of_all_cores": 2.934,
+  "process_peak_rss_mib": 10211.414,
+  "available_processors": 192,
+  "java_version": "21.0.12.1",
+  "gce_instance_id": "2600115956403812512",
+  "gce_instance_name": "dhriti-read-vm-central1-u2404",
+  "gce_zone": "us-central1-f",
+  "gce_machine_type": "c4-standard-192",
+  "gce_project": "gcs-hyd-connector-benchmarks",
+  "cloud_monitoring": {
+    "window_start": "2026-11-05T08:34:06Z",
+    "window_end": "2026-11-05T08:39:06Z",
+    "cpu_utilization_percent": {
+      "samples": 5,
+      "mean": 4.17,
+      "peak": 4.69
+    },
+    "memory_percent_used": {
+      "samples": 5,
+      "mean": 2.54,
+      "peak": 2.68
+    }
+  }
+}
