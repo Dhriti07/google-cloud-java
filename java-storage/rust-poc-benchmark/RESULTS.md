@@ -189,6 +189,32 @@ directly, once in each direction, through JNI:
 The Java path makes the same single copy for these APIs. The higher Rust peak memory on Bidi
 reads comes from the Rust SDK allocating a fresh buffer per received chunk, not from the JNI copy.
 
+## FYI: TCP connections and threads
+
+The two engines use a different number of gRPC connections by default, but that difference only
+matters in the 48-thread tests:
+
+- A gRPC **stream** (one read session or one upload) always runs on a **single connection**. Many
+  streams can share one connection, but they then share its capacity.
+- **Java** uses **1 connection** by default. **Rust** opens **many** (up to one per CPU).
+
+**Tests 1, 2 and 3** (Open, Read50x2x4, Random8K):
+
+- These use **one thread with one stream** at a time.
+- So only **one connection carries data**, on both Java and Rust. Rust's extra connections stay
+  idle.
+- The results were close (e.g. Random8K 41 vs 38 ms), so the differences here come from the
+  engines, not connections.
+
+**Tests 4 and 5** (48 parallel reads / writes):
+
+- These run **48 streams at the same time**.
+- **Java** puts all 48 on its **one connection**, so they share its limited capacity.
+- **Rust** spreads them over **64–192 connections**, so they run in parallel.
+- Result: Rust was much faster (reads 11.8 vs 2.4 Gbps, writes 36.8 vs 2.8 Gbps).
+- In an earlier test where both used 48 connections, reads were about equal. So most of the gap
+  comes from the number of connections, not the engine speed.
+
 ## What the numbers show
 
 - **Bidi, 48 threads (4 and 5):** Rust moves far more data.
