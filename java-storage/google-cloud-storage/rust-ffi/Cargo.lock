@@ -536,6 +536,7 @@ dependencies = [
  "prost-build",
  "prost-types",
  "tokio",
+ "tonic",
 ]
 
 [[package]]

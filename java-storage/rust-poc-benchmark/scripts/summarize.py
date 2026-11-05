@@ -47,6 +47,7 @@ def get(s, *path):
 
 COLUMNS = [
     # (header, path, digits)
+    ("MB/s", ("throughput_MBps",), 1),
     ("Gbps", ("throughput_Gbps",), 2),
     ("items/s", ("items_per_sec",), 0),
     ("ops/s", ("ops_per_sec",), 2),
@@ -74,7 +75,9 @@ def main(root):
 
     for op, by_label in runs.items():
         is_list = op.startswith("LIST")
-        cols = [c for c in COLUMNS if c[0] != ("Gbps" if is_list else "items/s")]
+        is_list = is_list or op == "OPEN"
+        drop = {"MB/s", "Gbps"} if is_list else {"items/s"}
+        cols = [c for c in COLUMNS if c[0] not in drop]
         first = next(iter(by_label.values()))[0][1]
         print(f"## {op}\n")
         print(

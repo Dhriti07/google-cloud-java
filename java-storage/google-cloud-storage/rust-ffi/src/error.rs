@@ -42,11 +42,35 @@ impl FfiError {
 impl From<google_cloud_storage::Error> for FfiError {
     fn from(e: google_cloud_storage::Error) -> Self {
         Self {
-            grpc_code: e.status().map(|s| s.code as i32).unwrap_or(-1),
+            grpc_code: e
+                .status()
+                .map(|s| s.code as i32)
+                .or_else(|| nested_grpc_code(&e))
+                .unwrap_or(-1),
             http_status: e.http_status_code().map(i32::from).unwrap_or(-1),
             message: e.to_string(),
         }
     }
+}
+
+/// Some SDK errors carry the service's gRPC status inside another error, e.g. a failed Bidi
+/// Appendable Write surfaces as "cannot serialize the request" wrapping the transport error that
+/// holds `RESOURCE_EXHAUSTED`. Walk the source chain so Java still gets the real status code.
+fn nested_grpc_code(e: &(dyn std::error::Error + 'static)) -> Option<i32> {
+    let mut cur = e.source();
+    while let Some(err) = cur {
+        if let Some(s) = err
+            .downcast_ref::<google_cloud_storage::Error>()
+            .and_then(|g| g.status())
+        {
+            return Some(s.code as i32);
+        }
+        if let Some(s) = err.downcast_ref::<tonic::Status>() {
+            return Some(s.code() as i32);
+        }
+        cur = err.source();
+    }
+    None
 }
 
 impl From<jni::errors::Error> for FfiError {
@@ -101,6 +125,21 @@ mod tests {
             Default::default(),
         ));
         assert_eq!(e.http_status, 503);
+    }
+
+    #[test]
+    fn nested_grpc_status_is_found() {
+        let inner = google_cloud_storage::Error::io(tonic::Status::resource_exhausted("quota"));
+        let e = FfiError::from(google_cloud_storage::Error::ser(inner));
+        assert_eq!(e.grpc_code, 8);
+        assert!(e.message.contains("quota"), "{}", e.message);
+
+        let status = Status::default()
+            .set_code(Code::ResourceExhausted)
+            .set_message("quota");
+        let inner = google_cloud_storage::Error::service(status);
+        let e = FfiError::from(google_cloud_storage::Error::ser(inner));
+        assert_eq!(e.grpc_code, 8);
     }
 
     #[test]

@@ -13,48 +13,46 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Runs Rapid workloads 4, 5 and 6 on both engines, several rounds, alternating the order, with a
-# cooldown between runs. Same jar and same JVM flags for every run; only the engine flag and the
-# connection settings differ. Then fetches Cloud Monitoring CPU/memory and writes summary.md.
+# Runs every workload once on both engines (Java defaults vs Rust defaults), one run at a time with
+# a cooldown between runs, then fetches Cloud Monitoring CPU/memory and writes summary.md.
 #
-# Configurations for the data workloads (read, write):
-#   java-default   Java path, one Storage (= 1 gRPC connection, what users get today)
-#   rust-default   Rust SDK defaults (= 1 gRPC connection per vCPU for the data path)
-#   rust-1conn     Rust with 1 connection          (same connections as java-default)
-#   java-48conn    Java with 48 Storage instances  (1 per thread, 48 connections)
-#   rust-48conn    Rust with 48 connections        (same connections as java-48conn)
-# List workloads use one connection on both engines by default, so they run the defaults only.
+#   1  Open                        bidi
+#   2  Read50x2x4 concurrent/serial bidi, json
+#   3  Random8K                     bidi, json
+#   4  16 MiB reads, 48 threads     bidi, json
+#   5  200 MB writes, 48 threads    bidi (appendable, zonal bucket), json (regional bucket)
+#   6  List Objects / List Buckets  gRPC
+#
+# Same jar and JVM flags for every run; only -Dgcs.rust.lib switches the engine. CloudPath on both.
 #
 # Usage (on the VM, after setup_vm.sh):
-#   bash run_all.sh                     # everything, ~3 h with the defaults below
-#   ROUNDS=1 DURATION=60 bash run_all.sh   # quick check
+#   bash run_all.sh            # the full run (~2 h 15 min)
+#   SMOKE=1 bash run_all.sh    # every run for 45 s, to catch problems first (~30 min)
 set -uo pipefail
 
-ROUNDS=${ROUNDS:-3}
-DURATION=${DURATION:-300}
-LIST_DURATION=${LIST_DURATION:-60}
-COOLDOWN=${COOLDOWN:-60}
-THREADS=${THREADS:-48}
-WORKLOADS=${WORKLOADS:-"read write list-objects list-buckets"}
-DATA_CONFIGS=${DATA_CONFIGS:-"java-default rust-default rust-1conn java-48conn rust-48conn"}
-READ_BUCKET=${READ_BUCKET:-dhriti-read-west1}
-WRITE_BUCKET=${WRITE_BUCKET:-dhriti-zonal-read-west1}
-LIST_BUCKET=${LIST_BUCKET:-dhriti-read-west1}
+REGIONAL=${REGIONAL:-dhriti-read-west1}
+ZONAL=${ZONAL:-dhriti-zonal-read-west1}
 PROJECT=${PROJECT:-gcs-hyd-connector-benchmarks}
+COOLDOWN=${COOLDOWN:-60}
+SMOKE=${SMOKE:-}
+# Optional fixed heap; by default no heap flags (the JVM sizes the heap itself).
 HEAP=${HEAP:-}
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../../.." && pwd)
 JAR=$ROOT/java-storage/rust-poc-benchmark/target/rust-poc-benchmark.jar
 LIB=$ROOT/java-storage/google-cloud-storage/rust-ffi/target/release/libgcs_rust_ffi.so
-OUT=${OUT:-$HOME/rust-poc-results/$(date -u +%Y%m%dT%H%M%SZ)}
+OUT=${OUT:-$HOME/rust-poc-results/$(date -u +%Y%m%dT%H%M%SZ)${SMOKE:+-smoke}}
 JAVA=${JAVA:-/usr/lib/jvm/java-21-openjdk-amd64/bin/java}
-# Identical for every run. By default no heap flags: the JVM sizes the heap itself, as it would for
-# a user who doesn't tune it. Set HEAP (e.g. HEAP=16g) to use a fixed heap instead.
 if [ -n "$HEAP" ]; then
   JVM_FLAGS="-Xms$HEAP -Xmx$HEAP -XX:MaxDirectMemorySize=$HEAP"
 else
   JVM_FLAGS=""
+fi
+EXTRA=""
+if [ -n "$SMOKE" ]; then
+  EXTRA="--duration=45 --warmup=5"
+  COOLDOWN=5
 fi
 
 for f in "$JAR" "$LIB"; do
@@ -68,61 +66,61 @@ mkdir -p "$OUT"
 exec > >(tee -a "$OUT/run_all.log") 2>&1
 echo "results: $OUT"
 
-# config -> "extra JVM flags|extra benchmark args"
-config() {
-  case $1 in
-    java-default) echo "|--clients=1" ;;
-    rust-default) echo "-Dgcs.rust.lib=$LIB|--clients=1" ;;
-    rust-1conn) echo "-Dgcs.rust.lib=$LIB -Dgcs.rust.grpc.subchannels=1|--clients=1" ;;
-    java-48conn) echo "|--clients=48" ;;
-    rust-48conn) echo "-Dgcs.rust.lib=$LIB -Dgcs.rust.grpc.subchannels=48|--clients=1" ;;
-    *) echo "unknown config $1" >&2; exit 1 ;;
-  esac
-}
+# One line per workload variant: benchmark arguments. Each runs on both engines.
+RUNS=(
+  "--workload=open --transport=bidi --bucket=$REGIONAL"
+  "--workload=read50x2x4 --transport=bidi --mode=concurrent --bucket=$REGIONAL"
+  "--workload=read50x2x4 --transport=bidi --mode=serial --bucket=$REGIONAL"
+  "--workload=read50x2x4 --transport=json --mode=concurrent --bucket=$REGIONAL"
+  "--workload=read50x2x4 --transport=json --mode=serial --bucket=$REGIONAL"
+  "--workload=random8k --transport=bidi --bucket=$REGIONAL"
+  "--workload=random8k --transport=json --bucket=$REGIONAL"
+  "--workload=read --transport=bidi --bucket=$REGIONAL"
+  "--workload=read --transport=json --bucket=$REGIONAL"
+  "--workload=write --transport=bidi --bucket=$ZONAL"
+  "--workload=write --transport=json --bucket=$REGIONAL"
+  "--workload=list-objects --transport=bidi --bucket=$REGIONAL"
+  "--workload=list-buckets --transport=bidi --project=$PROJECT"
+)
 
-workload_args() {
-  case $1 in
-    read) echo "--workload=read --bucket=$READ_BUCKET --threads=$THREADS --duration=$DURATION" ;;
-    write) echo "--workload=write --bucket=$WRITE_BUCKET --threads=$THREADS --duration=$DURATION" ;;
-    list-objects) echo "--workload=list-objects --bucket=$LIST_BUCKET --duration=$LIST_DURATION" ;;
-    list-buckets) echo "--workload=list-buckets --project=$PROJECT --duration=$LIST_DURATION" ;;
-  esac
-}
-
-run_one() { # workload config
-  local w=$1 c=$2 spec jvm args
-  spec=$(config "$c")
-  jvm=${spec%%|*}
-  args=${spec#*|}
-  echo "== $(date -u +%T) $w $c"
+run_one() { # label, args...
+  local label=$1 flag=""
+  shift
+  [ "$label" = rust-default ] && flag="-Dgcs.rust.lib=$LIB"
+  echo "== $(date -u +%T) $label $*"
   # shellcheck disable=SC2086
-  "$JAVA" $JVM_FLAGS $jvm -jar "$JAR" $(workload_args "$w") $args --label="$c" --out="$OUT" \
-    | grep -E '^(creating|deleting|results:)|"(ops|errors|first_error|latency_ms_p50|latency_ms_p99|throughput_Gbps|items_per_sec|tcp_established_443_mid|nic_rx_Gbps|nic_tx_Gbps)"'
+  "$JAVA" $JVM_FLAGS $flag -jar "$JAR" "$@" $EXTRA --label="$label" --out="$OUT" \
+    | grep -E '^(creating|results:)|"(ops|errors|first_error|latency_ms_p50|latency_ms_p99|throughput_MBps|items_per_sec|tcp_established_443_mid)"'
   sleep "$COOLDOWN"
 }
 
-# Create the read object and the list objects once, untimed, so no measured run pays for it.
+# Create the test objects once, untimed: 200 MB (workload 4), 200 MiB (2), 100 MiB (1, 3), and the
+# 100 list objects (6).
 echo "== prepare"
-"$JAVA" $JVM_FLAGS -jar "$JAR" --workload=read --bucket="$READ_BUCKET" --threads=1 --duration=1 \
-  --warmup=0 --out="$OUT/prepare" >/dev/null
-"$JAVA" $JVM_FLAGS -jar "$JAR" --workload=list-objects --bucket="$LIST_BUCKET" --duration=1 \
-  --warmup=0 --out="$OUT/prepare" >/dev/null
-
-for ((r = 1; r <= ROUNDS; r++)); do
-  for w in $WORKLOADS; do
-    if [[ $w == list-* ]]; then configs="java-default rust-default"; else configs=$DATA_CONFIGS; fi
-    # Alternate the order every round so neither engine always goes first.
-    if ((r % 2 == 0)); then configs=$(echo "$configs" | tr ' ' '\n' | tac | tr '\n' ' '); fi
-    echo "#### round $r/$ROUNDS: $w ($configs)"
-    for c in $configs; do
-      run_one "$w" "$c"
-    done
-  done
+for a in "--workload=read" "--workload=read50x2x4" "--workload=random8k" "--workload=list-objects"; do
+  "$JAVA" $JVM_FLAGS -jar "$JAR" $a --bucket="$REGIONAL" --threads=1 --duration=1 --warmup=0 \
+    --out="$OUT/prepare" >/dev/null || echo "prepare failed: $a"
 done
 
-# Cloud Monitoring ingests with a few minutes' delay.
-echo "== waiting 240 s for Cloud Monitoring"
-sleep 240
-python3 "$HERE/cloud_metrics.py" "$OUT"/*/summary.json || echo "cloud metrics failed (continuing)"
+i=0
+for r in "${RUNS[@]}"; do
+  # Alternate which engine goes first so neither always runs first.
+  # shellcheck disable=SC2086
+  if ((i % 2 == 0)); then
+    run_one java-default $r
+    run_one rust-default $r
+  else
+    run_one rust-default $r
+    run_one java-default $r
+  fi
+  i=$((i + 1))
+done
+
+if [ -z "$SMOKE" ]; then
+  # Cloud Monitoring ingests with a few minutes' delay.
+  echo "== waiting 240 s for Cloud Monitoring"
+  sleep 240
+  python3 "$HERE/cloud_metrics.py" "$OUT"/*/summary.json || echo "cloud metrics failed (continuing)"
+fi
 python3 "$HERE/summarize.py" "$OUT" > "$OUT/summary.md"
 echo "done: $OUT/summary.md"

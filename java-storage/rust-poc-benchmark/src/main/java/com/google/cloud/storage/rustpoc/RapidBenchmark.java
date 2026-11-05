@@ -16,7 +16,10 @@
 
 package com.google.cloud.storage.rustpoc;
 
+import com.google.api.core.ApiFuture;
+import com.google.api.core.ApiFutures;
 import com.google.api.gax.paging.Page;
+import com.google.cloud.ReadChannel;
 import com.google.cloud.WriteChannel;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobAppendableUpload;
@@ -27,12 +30,10 @@ import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.BlobReadSession;
 import com.google.cloud.storage.Bucket;
-import com.google.cloud.storage.GrpcStorageOptions;
 import com.google.cloud.storage.RangeSpec;
 import com.google.cloud.storage.ReadProjectionConfigs;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.Storage.BlobListOption;
-import com.google.cloud.storage.Storage.BlobWriteOption;
 import com.google.cloud.storage.Storage.BucketListOption;
 import com.google.cloud.storage.StorageClass;
 import com.google.cloud.storage.StorageOptions;
@@ -50,7 +51,6 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -61,44 +61,55 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.LongAdder;
 
 /**
- * Rapid workloads 4, 5 and 6 through the normal java-storage API.
+ * Workloads 1-6 through the normal java-storage API, on Java or on the Rust SDK.
  *
  * <p>The engine is chosen only by the JVM flag: with {@code -Dgcs.rust.lib=<libgcs_rust_ffi.so>}
- * the gRPC client runs on the Rust SDK; without it, on the Java path. Everything else (this code,
- * the jar, the JVM) is the same. Both sides use CloudPath (DirectPath off).
+ * the client runs on the Rust SDK; without it, on the Java path. Everything else (this code, the
+ * jar, the JVM) is the same. Both engines use CloudPath. {@code --transport=bidi} uses a gRPC
+ * client, {@code --transport=json} an HTTP client.
  *
  * <ul>
- *   <li>{@code --workload=read} (4): N threads, each with its own {@link BlobReadSession}, read
- *       random {@code --range-size} ranges of one {@code --object-size} object with {@code
- *       readAs(asFutureBytes())}.
- *   <li>{@code --workload=write} (5): N threads upload {@code --object-size} objects with {@code
- *       blobAppendableUpload} (zonal bucket), writing {@code --write-chunk} slices.
- *   <li>{@code --workload=list-objects} / {@code list-buckets} (6): one page of {@code
- *       --list-items} items per call.
+ *   <li>{@code open} (1): start a Bidi Read, wait for the first response (metadata), close.
+ *   <li>{@code read50x2x4} (2): 50 reads of 2 MiB at a 4 MiB stride from a 200 MiB object, {@code
+ *       --mode=concurrent} or {@code serial}.
+ *   <li>{@code random8k} (3): random 8 KiB reads from a 100 MiB object.
+ *   <li>{@code read} (4): N threads read random {@code --range-size} ranges of an {@code
+ *       --object-size} object.
+ *   <li>{@code write} (5): N threads each keep overwriting their own {@code --object-size} object
+ *       ({@code blobAppendableUpload} for bidi, {@code writer} for json), in {@code --write-chunk}
+ *       slices.
+ *   <li>{@code list-objects} / {@code list-buckets} (6): one page of {@code --list-items} items.
  * </ul>
  *
- * <p>Connections: a Java {@code Storage} uses one gRPC connection; the Rust SDK opens one per CPU
- * for the data path. {@code --clients=K} creates K {@code Storage} instances (worker t uses t % K),
- * and {@code -Dgcs.rust.grpc.subchannels=N} sets the Rust connection count, so runs can be matched.
- * Established TCP connections to port 443 and NIC Gbps are recorded under {@code params.network}.
- *
- * <p>Latency is measured around the outermost API call(s) of each operation; operations that end in
- * the warm-up are not counted. Results go to {@code --out/<workload>-<engine>-<time>/}.
+ * <p>Workloads 1-3 and 6 run one operation at a time ({@code --threads=1}); 4 and 5 use 48 threads.
+ * Latency is measured around the outermost API call(s) of each operation; operations that end in
+ * the warm-up are not counted. Established TCP connections to port 443 and NIC Gbps are recorded
+ * under {@code params.network}. Results go to {@code --out/<workload>-<transport>-...-<label>/}.
  */
 public final class RapidBenchmark {
 
   private static final int MiB = 1024 * 1024;
+  // Upper bound for one read (or one session open). A stalled call becomes a counted error instead
+  // of hanging the run.
+  private static final long OP_TIMEOUT_SEC = 120;
+  // Upper bound for finishing one 200 MB write.
+  private static final long WRITE_TIMEOUT_SEC = 600;
 
   private final Map<String, String> args;
   private final String engine;
   private final String workload;
   private final String bucket;
   private final String project;
+  // --transport=bidi (gRPC client) or json (HTTP client).
+  private final boolean json;
   private final int threads;
   private final int durationSec;
   private final int warmupSec;
@@ -124,16 +135,25 @@ public final class RapidBenchmark {
     this.workload = required("workload");
     this.bucket = workload.equals("list-buckets") ? arg("bucket", "") : required("bucket");
     this.project = arg("project", "");
-    this.threads = Integer.parseInt(arg("threads", workload.startsWith("list") ? "1" : "48"));
-    this.durationSec = Integer.parseInt(arg("duration", "300"));
-    this.warmupSec = Integer.parseInt(arg("warmup", workload.startsWith("list") ? "10" : "30"));
+    boolean heavy = workload.equals("read") || workload.equals("write");
+    this.json = arg("transport", "bidi").equals("json");
+    this.threads = Integer.parseInt(arg("threads", heavy ? "48" : "1"));
+    this.durationSec = Integer.parseInt(arg("duration", heavy ? "300" : "180"));
+    this.warmupSec = Integer.parseInt(arg("warmup", heavy ? "30" : "10"));
     this.clients = Integer.parseInt(arg("clients", "1"));
     this.objectSize = Long.parseLong(arg("object-size", String.valueOf(200_000_000L)));
     this.rangeSize = Integer.parseInt(arg("range-size", String.valueOf(16 * MiB)));
     this.writeChunk = Integer.parseInt(arg("write-chunk", String.valueOf(2 * MiB)));
     this.listItems = Integer.parseInt(arg("list-items", "100"));
     this.label = arg("label", engine);
-    String run = workload + "-" + label + "-" + Instant.now().toString().replace(':', '-');
+    String run =
+        String.join(
+            "-",
+            workload,
+            json ? "json" : "bidi",
+            arg("mode", "x"),
+            label,
+            Instant.now().toString().replace(':', '-'));
     this.out = Paths.get(arg("out", "results"), run);
   }
 
@@ -152,8 +172,10 @@ public final class RapidBenchmark {
     Files.createDirectories(out);
     // Java's built-in gRPC client metrics are off: they only record calls on the Java channel, so
     // leaving them on would add a cost to the Java runs that the Rust runs don't pay.
-    GrpcStorageOptions.Builder b =
-        StorageOptions.grpc().setAttemptDirectPath(false).setEnableGrpcClientMetrics(false);
+    StorageOptions.Builder b =
+        json
+            ? StorageOptions.http()
+            : StorageOptions.grpc().setAttemptDirectPath(false).setEnableGrpcClientMetrics(false);
     if (!project.isEmpty()) {
       b.setProjectId(project);
     }
@@ -164,6 +186,15 @@ public final class RapidBenchmark {
     Storage storage = pool.get(0);
     try {
       switch (workload) {
+        case "open":
+          runOpen(storage);
+          break;
+        case "read50x2x4":
+          runRead50x2x4(storage);
+          break;
+        case "random8k":
+          runRandom8k(storage);
+          break;
         case "read":
           runRead(storage);
           break;
@@ -192,49 +223,158 @@ public final class RapidBenchmark {
   }
 
   // ---------------------------------------------------------------------------------------------
-  // Workload 4: Bidi Read
+  // Workloads 1-3 (one operation at a time, --threads=1)
   // ---------------------------------------------------------------------------------------------
 
-  private void runRead(Storage storage) throws Exception {
-    String name = arg("object", "rust-poc-read-" + objectSize);
-    BlobId id = ensureObject(storage, name, objectSize);
-    long size;
-    String sessionClass;
-    try (BlobReadSession probe = storage.blobReadSession(id).get(60, TimeUnit.SECONDS)) {
-      size = probe.getBlobInfo().getSize();
-      sessionClass = probe.getClass().getSimpleName();
-    }
-    if (size < rangeSize) {
-      throw new IllegalStateException(name + " is smaller than --range-size");
-    }
-    long ranges = size / rangeSize;
+  /** 1. Open: start a Bidi Read, wait for the first response (object metadata), close. */
+  private void runOpen(Storage storage) throws Exception {
+    BlobId id = ensureObject(storage, arg("object", "rust-poc-read-" + 100 * MiB), 100 * MiB);
     Map<String, Object> params = new LinkedHashMap<>();
-    params.put("object", name);
-    params.put("object_size", size);
-    params.put("range_size", rangeSize);
-    params.put("engine_class", sessionClass);
+    params.put("object", id.getName());
+    params.put("engine_class", sessionClass(storage, id));
     runTimed(
-        "BIDI_READ",
-        thread -> {
-          BlobReadSession session =
-              storageFor(thread).blobReadSession(id).get(60, TimeUnit.SECONDS);
-          Random rnd = new Random(thread);
-          return new Op() {
-            @Override
-            public long run() throws Exception {
-              long offset = (rnd.nextLong() & Long.MAX_VALUE) % ranges * rangeSize;
-              byte[] got =
-                  session
-                      .readAs(
-                          ReadProjectionConfigs.asFutureBytes()
-                              .withRangeSpec(RangeSpec.of(offset, rangeSize)))
-                      .get();
-              return got.length;
-            }
+        "OPEN",
+        thread ->
+            () -> {
+              BlobReadSession s =
+                  storageFor(thread).blobReadSession(id).get(OP_TIMEOUT_SEC, TimeUnit.SECONDS);
+              s.close();
+              return 1;
+            },
+        params);
+  }
 
+  /**
+   * 2. Read50x2x4: from a 200 MiB object, read 50 ranges of 2 MiB at a 4 MiB stride. One operation
+   * = all 50 reads. {@code --mode=concurrent} issues all 50 then waits; {@code serial} reads one
+   * after another. {@code --transport=bidi} uses one open {@link BlobReadSession}; {@code json}
+   * uses one {@code reader()} per range.
+   */
+  private void runRead50x2x4(Storage storage) throws Exception {
+    final int n = 50;
+    final int len = 2 * MiB;
+    final long stride = 4L * MiB;
+    String mode = arg("mode", "concurrent");
+    boolean concurrent = mode.equals("concurrent");
+    BlobId id = ensureObject(storage, arg("object", "rust-poc-read-" + 200 * MiB), 200L * MiB);
+    Map<String, Object> params = new LinkedHashMap<>();
+    params.put("object", id.getName());
+    params.put("mode", mode);
+    params.put("ranges", n);
+    params.put("range_size", len);
+    params.put("stride", stride);
+    if (json) {
+      params.put("engine_class", readerClass(storage, id));
+      ExecutorService pool = Executors.newFixedThreadPool(n);
+      try {
+        runTimed(
+            "READ50X2X4_JSON_" + mode.toUpperCase(Locale.ROOT),
+            thread -> {
+              Storage s = storageFor(thread);
+              ByteBuffer[] bufs = new ByteBuffer[n];
+              for (int i = 0; i < n; i++) {
+                bufs[i] = ByteBuffer.allocate(len);
+              }
+              return () -> {
+                long total = 0;
+                if (concurrent) {
+                  List<Future<Integer>> fs = new ArrayList<>(n);
+                  for (int i = 0; i < n; i++) {
+                    long off = i * stride;
+                    ByteBuffer b = bufs[i];
+                    fs.add(pool.submit(() -> jsonRange(s, id, off, b)));
+                  }
+                  for (Future<Integer> f : fs) {
+                    total += f.get(OP_TIMEOUT_SEC, TimeUnit.SECONDS);
+                  }
+                } else {
+                  for (int i = 0; i < n; i++) {
+                    total += jsonRange(s, id, i * stride, bufs[i]);
+                  }
+                }
+                return total;
+              };
+            },
+            params);
+      } finally {
+        pool.shutdownNow();
+      }
+      return;
+    }
+    params.put("engine_class", sessionClass(storage, id));
+    runTimed(
+        "READ50X2X4_BIDI_" + mode.toUpperCase(Locale.ROOT),
+        thread ->
+            new SessionOp(storageFor(thread), id) {
+              @Override
+              long read(BlobReadSession session) throws Exception {
+                long total = 0;
+                if (concurrent) {
+                  List<ApiFuture<byte[]>> fs = new ArrayList<>(n);
+                  for (int i = 0; i < n; i++) {
+                    fs.add(
+                        session.readAs(
+                            ReadProjectionConfigs.asFutureBytes()
+                                .withRangeSpec(RangeSpec.of(i * stride, len))));
+                  }
+                  for (byte[] b : ApiFutures.allAsList(fs).get(OP_TIMEOUT_SEC, TimeUnit.SECONDS)) {
+                    total += b.length;
+                  }
+                } else {
+                  for (int i = 0; i < n; i++) {
+                    total +=
+                        session
+                            .readAs(
+                                ReadProjectionConfigs.asFutureBytes()
+                                    .withRangeSpec(RangeSpec.of(i * stride, len)))
+                            .get(OP_TIMEOUT_SEC, TimeUnit.SECONDS)
+                            .length;
+                  }
+                }
+                return total;
+              }
+            },
+        params);
+  }
+
+  /**
+   * 3. Random8K: from an open 100 MiB object, read random 8 KiB ranges, one at a time. {@code bidi}
+   * reads over one open {@link BlobReadSession}; {@code json} opens one {@code reader()} per read.
+   */
+  private void runRandom8k(Storage storage) throws Exception {
+    final int len = 8 * 1024;
+    BlobId id = ensureObject(storage, arg("object", "rust-poc-read-" + 100 * MiB), 100 * MiB);
+    long slots = 100L * MiB / len;
+    Map<String, Object> params = new LinkedHashMap<>();
+    params.put("object", id.getName());
+    params.put("range_size", len);
+    if (json) {
+      params.put("engine_class", readerClass(storage, id));
+      runTimed(
+          "RANDOM8K_JSON",
+          thread -> {
+            Storage s = storageFor(thread);
+            Random rnd = new Random(thread);
+            ByteBuffer buf = ByteBuffer.allocate(len);
+            return () -> jsonRange(s, id, (rnd.nextLong() & Long.MAX_VALUE) % slots * len, buf);
+          },
+          params);
+      return;
+    }
+    params.put("engine_class", sessionClass(storage, id));
+    runTimed(
+        "RANDOM8K_BIDI",
+        thread -> {
+          Random rnd = new Random(thread);
+          return new SessionOp(storageFor(thread), id) {
             @Override
-            public void close() throws IOException {
-              session.close();
+            long read(BlobReadSession session) throws Exception {
+              long off = (rnd.nextLong() & Long.MAX_VALUE) % slots * len;
+              return session
+                  .readAs(
+                      ReadProjectionConfigs.asFutureBytes().withRangeSpec(RangeSpec.of(off, len)))
+                  .get(OP_TIMEOUT_SEC, TimeUnit.SECONDS)
+                  .length;
             }
           };
         },
@@ -242,62 +382,198 @@ public final class RapidBenchmark {
   }
 
   // ---------------------------------------------------------------------------------------------
-  // Workload 5: Bidi Appendable Write
+  // Workload 4: 16 MiB reads of a 200 MB object, 48 threads
   // ---------------------------------------------------------------------------------------------
 
+  private void runRead(Storage storage) throws Exception {
+    BlobId id = ensureObject(storage, arg("object", "rust-poc-read-" + objectSize), objectSize);
+    long size = storage.get(id).getSize();
+    if (size < rangeSize) {
+      throw new IllegalStateException(id.getName() + " is smaller than --range-size");
+    }
+    long ranges = size / rangeSize;
+    Map<String, Object> params = new LinkedHashMap<>();
+    params.put("object", id.getName());
+    params.put("object_size", size);
+    params.put("range_size", rangeSize);
+    if (json) {
+      params.put("engine_class", readerClass(storage, id));
+      runTimed(
+          "READ_JSON",
+          thread -> {
+            Storage s = storageFor(thread);
+            Random rnd = new Random(thread);
+            ByteBuffer buf = ByteBuffer.allocate(rangeSize);
+            return () ->
+                jsonRange(s, id, (rnd.nextLong() & Long.MAX_VALUE) % ranges * rangeSize, buf);
+          },
+          params);
+      return;
+    }
+    params.put("engine_class", sessionClass(storage, id));
+    runTimed(
+        "BIDI_READ",
+        thread -> {
+          Random rnd = new Random(thread);
+          return new SessionOp(storageFor(thread), id) {
+            @Override
+            long read(BlobReadSession session) throws Exception {
+              long offset = (rnd.nextLong() & Long.MAX_VALUE) % ranges * rangeSize;
+              return session
+                  .readAs(
+                      ReadProjectionConfigs.asFutureBytes()
+                          .withRangeSpec(RangeSpec.of(offset, rangeSize)))
+                  .get(OP_TIMEOUT_SEC, TimeUnit.SECONDS)
+                  .length;
+            }
+          };
+        },
+        params);
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Workload 5: 200 MB writes, 48 threads
+  // ---------------------------------------------------------------------------------------------
+
+  /**
+   * Each thread keeps overwriting its own object name, so the bytes stored stay at about threads x
+   * object size (a Rapid bucket counts stored bytes against a per-zone quota).
+   */
   private void runWrite(Storage storage) throws Exception {
     ByteBuffer payload = randomPayload(objectSize);
-    String prefix =
-        arg("prefix", "rust-poc-write-" + engine + "-" + System.currentTimeMillis() + "/");
-    List<BlobId> created = Collections.synchronizedList(new ArrayList<>());
+    String prefix = arg("prefix", "rust-poc-" + (json ? "jsonwrite" : "write") + "-" + label + "/");
     String[] uploadClass = {""};
     Map<String, Object> params = new LinkedHashMap<>();
     params.put("object_size", objectSize);
     params.put("write_chunk", writeChunk);
     params.put("prefix", prefix);
     runTimed(
-        "BIDI_APPENDABLE_WRITE",
+        json ? "WRITE_JSON" : "BIDI_APPENDABLE_WRITE",
         thread -> {
-          int[] seq = {0};
+          BlobInfo info = BlobInfo.newBuilder(bucket, prefix + thread).build();
+          Storage s = storageFor(thread);
+          if (json) {
+            return () -> {
+              WriteChannel w = s.writer(info);
+              uploadClass[0] = w.getClass().getSimpleName();
+              try (WriteChannel ch = w) {
+                writeSlices(ch, payload);
+              }
+              return objectSize;
+            };
+          }
           return () -> {
-            BlobInfo info = BlobInfo.newBuilder(bucket, prefix + thread + "-" + seq[0]++).build();
             BlobAppendableUpload upload =
-                storageFor(thread)
-                    .blobAppendableUpload(
-                        info,
-                        BlobAppendableUploadConfig.of()
-                            .withCloseAction(CloseAction.FINALIZE_WHEN_CLOSING),
-                        BlobWriteOption.doesNotExist());
+                s.blobAppendableUpload(
+                    info,
+                    BlobAppendableUploadConfig.of()
+                        .withCloseAction(CloseAction.FINALIZE_WHEN_CLOSING));
             uploadClass[0] = upload.getClass().getSimpleName();
-            writeAll(upload, payload);
-            BlobInfo done = upload.getResult().get(10, TimeUnit.MINUTES);
-            created.add(done.getBlobId());
-            return done.getSize();
+            try (AppendableUploadWriteableByteChannel ch = upload.open()) {
+              writeSlices(ch, payload);
+            }
+            return upload.getResult().get(WRITE_TIMEOUT_SEC, TimeUnit.SECONDS).getSize();
           };
         },
         params,
         () -> params.put("engine_class", uploadClass[0]));
     if (Boolean.parseBoolean(arg("cleanup", "true"))) {
-      System.out.printf("deleting %d objects under %s%n", created.size(), prefix);
-      for (BlobId id : created) {
-        storage.delete(id);
+      for (int t = 0; t < threads; t++) {
+        storage.delete(BlobId.of(bucket, prefix + t));
       }
     }
   }
 
-  private void writeAll(BlobAppendableUpload upload, ByteBuffer payload) throws IOException {
+  /** Writes the payload in --write-chunk slices, counting bytes for window throughput. */
+  private void writeSlices(java.nio.channels.WritableByteChannel ch, ByteBuffer payload)
+      throws IOException {
     ByteBuffer src = payload.duplicate();
     src.clear();
-    try (AppendableUploadWriteableByteChannel ch = upload.open()) {
-      while (src.hasRemaining()) {
-        ByteBuffer slice = src.slice();
-        slice.limit(Math.min(writeChunk, src.remaining()));
-        int n = slice.remaining();
-        while (slice.hasRemaining()) {
-          bytesWritten.add(ch.write(slice));
-        }
-        src.position(src.position() + n);
+    while (src.hasRemaining()) {
+      ByteBuffer slice = src.slice();
+      slice.limit(Math.min(writeChunk, src.remaining()));
+      int n = slice.remaining();
+      while (slice.hasRemaining()) {
+        bytesWritten.add(ch.write(slice));
       }
+      src.position(src.position() + n);
+    }
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Read helpers
+  // ---------------------------------------------------------------------------------------------
+
+  /**
+   * A worker's Bidi Read session. If a read fails, the session is closed and a new one is opened
+   * for the next operation (what an application would do), and the error is still counted.
+   */
+  private abstract class SessionOp implements Op {
+    private final Storage storage;
+    private final BlobId id;
+    private BlobReadSession session;
+
+    SessionOp(Storage storage, BlobId id) throws Exception {
+      this.storage = storage;
+      this.id = id;
+      this.session = open();
+    }
+
+    private BlobReadSession open() throws Exception {
+      return storage.blobReadSession(id).get(OP_TIMEOUT_SEC, TimeUnit.SECONDS);
+    }
+
+    abstract long read(BlobReadSession session) throws Exception;
+
+    @Override
+    public long run() throws Exception {
+      try {
+        return read(session);
+      } catch (Exception e) {
+        try {
+          session.close();
+        } catch (Exception ignored) {
+          // replacing it anyway
+        }
+        session = open();
+        throw e;
+      }
+    }
+
+    @Override
+    public void close() throws IOException {
+      session.close();
+    }
+  }
+
+  /** Reads [offset, offset + buf.capacity()) with one {@code reader()}. Returns the bytes read. */
+  private static int jsonRange(Storage storage, BlobId id, long offset, ByteBuffer buf)
+      throws IOException {
+    buf.clear();
+    try (ReadChannel r = storage.reader(id.getBucket(), id.getName())) {
+      r.seek(offset);
+      r.limit(offset + buf.capacity());
+      while (buf.hasRemaining()) {
+        if (r.read(buf) < 0) {
+          break;
+        }
+      }
+    }
+    if (buf.hasRemaining()) {
+      throw new IOException("short read: " + buf.position() + " of " + buf.capacity());
+    }
+    return buf.position();
+  }
+
+  private static String sessionClass(Storage storage, BlobId id) throws Exception {
+    try (BlobReadSession s = storage.blobReadSession(id).get(OP_TIMEOUT_SEC, TimeUnit.SECONDS)) {
+      return s.getClass().getSimpleName();
+    }
+  }
+
+  private static String readerClass(Storage storage, BlobId id) throws IOException {
+    try (ReadChannel r = storage.reader(id.getBucket(), id.getName())) {
+      return r.getClass().getSimpleName();
     }
   }
 
@@ -376,8 +652,10 @@ public final class RapidBenchmark {
           storage.blobAppendableUpload(
               info,
               BlobAppendableUploadConfig.of().withCloseAction(CloseAction.FINALIZE_WHEN_CLOSING));
-      writeAll(upload, data);
-      return upload.getResult().get(10, TimeUnit.MINUTES).getBlobId();
+      try (AppendableUploadWriteableByteChannel ch = upload.open()) {
+        writeSlices(ch, data);
+      }
+      return upload.getResult().get(WRITE_TIMEOUT_SEC, TimeUnit.SECONDS).getBlobId();
     }
     try (WriteChannel w = storage.writer(info)) {
       while (data.hasRemaining()) {
@@ -527,7 +805,7 @@ public final class RapidBenchmark {
     net.put("nic_rx_Gbps", (nicEnd[0] - nicStart[0]) * 8 / secs / 1e9);
     net.put("nic_tx_Gbps", (nicEnd[1] - nicStart[1]) * 8 / secs / 1e9);
     params.put("network", net);
-    if (op.equals("BIDI_APPENDABLE_WRITE")) {
+    if (op.equals("BIDI_APPENDABLE_WRITE") || op.equals("WRITE_JSON")) {
       windowBytesWritten = writtenEnd - writtenStart;
     }
     report(op, logs, t0, measureStart, measureEnd, windowStart, windowEnd, cpuPct, params);
@@ -647,11 +925,13 @@ public final class RapidBenchmark {
     lat = Arrays.copyOf(lat, k);
     Arrays.sort(lat);
     double secs = (measureEnd - measureStart) / 1e9;
-    boolean list = op.startsWith("LIST");
+    // Item-counting operations report ops or items per second; the rest report bytes.
+    boolean list = op.startsWith("LIST") || op.equals("OPEN");
 
     Map<String, Object> s = new LinkedHashMap<>();
     s.put("op", op);
     s.put("engine", engine);
+    s.put("transport", json ? "json" : "bidi");
     s.put("label", label);
     s.put("bucket", bucket);
     s.put("threads", threads);
